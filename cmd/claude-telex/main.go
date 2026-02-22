@@ -3,7 +3,6 @@ package main
 
 import (
 	"log"
-	"os/exec"
 	"runtime"
 
 	"github.com/nguyenhx2/claude-telex/internal/hotkey"
@@ -17,10 +16,11 @@ func main() {
 	// Must lock OS thread for systray (macOS requires main thread)
 	runtime.LockOSThread()
 
-	// Single-instance: check if another claude-telex is already running
+	// Single-instance: if another claude-telex is already running,
+	// focus its Settings UI and exit silently (no cmd.exe flash).
 	if existingURL := settings.PingRunningInstance(); existingURL != "" {
 		log.Println("Another instance is running, opening its Settings UI...")
-		openURL(existingURL)
+		tray.OpenURL(existingURL)
 		return
 	}
 
@@ -49,15 +49,4 @@ func main() {
 
 	// Tray blocks until Quit
 	tray.Run(srv)
-}
-
-func openURL(url string) {
-	switch runtime.GOOS {
-	case "windows":
-		_ = exec.Command("cmd", "/c", "start", url).Start()
-	case "darwin":
-		_ = exec.Command("open", url).Start()
-	default:
-		_ = exec.Command("xdg-open", url).Start()
-	}
 }

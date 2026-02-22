@@ -2,10 +2,32 @@
 
 package tray
 
-import "os/exec"
+import (
+	"syscall"
+	"unsafe"
+)
 
-// openSettings opens the Settings UI in the default browser on Windows.
-// To use a native webview window instead, install MinGW and build with CGO_ENABLED=1.
+var (
+	shell32       = syscall.NewLazyDLL("shell32.dll")
+	shellExecuteW = shell32.NewProc("ShellExecuteW")
+)
+
+// openSettings opens the Settings UI in the default browser using ShellExecuteW.
+// This avoids spawning cmd.exe (which causes a visible console flash).
 func openSettings(srv interface{ URL() string }) {
-	_ = exec.Command("cmd", "/c", "start", srv.URL()).Start()
+	OpenURL(srv.URL())
+}
+
+// OpenURL opens a URL in the default browser without spawning a cmd.exe window.
+func OpenURL(url string) {
+	urlPtr, _ := syscall.UTF16PtrFromString(url)
+	verbPtr, _ := syscall.UTF16PtrFromString("open")
+	//nolint:errcheck
+	shellExecuteW.Call(
+		0,
+		uintptr(unsafe.Pointer(verbPtr)),
+		uintptr(unsafe.Pointer(urlPtr)),
+		0, 0,
+		uintptr(syscall.SW_SHOWNORMAL),
+	)
 }
