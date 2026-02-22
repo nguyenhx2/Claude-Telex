@@ -1,12 +1,15 @@
-.PHONY: build run clean release-dry lint
+.PHONY: build run clean release-dry lint test
 
-BIN := claude-vi
+BIN := claude-telex
 
 build:
-	go build -ldflags="-s -w" -o $(BIN)$(shell go env GOEXE) ./cmd/claude-vi
+	go build -ldflags="-s -w" -o $(BIN)$(shell go env GOEXE) ./cmd/claude-telex
 
 run:
-	go run ./cmd/claude-vi
+	go run ./cmd/claude-telex
+
+test:
+	go test ./...
 
 clean:
 	rm -f $(BIN) $(BIN).exe
