@@ -157,10 +157,34 @@
       color: var(--muted);
       font-family: 'Consolas', monospace;
       margin-top: 2px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 340px;
+      word-break: break-all;
+    }
+
+    .copy-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 6px;
+      transition: all .15s;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .copy-btn.copied {
+      border-color: var(--green);
+      color: var(--green);
     }
 
     /* ─── Badges & Chips ─── */
@@ -433,6 +457,13 @@
           CLI Path
         </div>
         <div id="cli-path" class="row-sub">-</div>
+        <button class="copy-btn" id="copy-path-btn" onclick="copyPath()" title="Copy path to clipboard">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          Copy
+        </button>
       </div>
     </div>
 
@@ -542,8 +573,9 @@
       }
       document.getElementById('version').textContent = s.version || '-';
       document.getElementById('os-info').textContent = s.os || '-';
-      document.getElementById('cli-path').textContent = s.path || '(not found)';
-      document.getElementById('cli-path').title = s.path || '';
+      const cliPath = s.path || '';
+      document.getElementById('cli-path').textContent = cliPath || '(not found)';
+      document.getElementById('copy-path-btn').style.display = cliPath ? '' : 'none';
       document.getElementById('toggle-enabled').checked = s.enabled;
       document.getElementById('toggle-autostart').checked = s.autostart;
     }
@@ -566,6 +598,20 @@
       const r = await api('/patch');
       toast(r.ok ? '✓ Patched successfully!' : '✗ ' + (r.error || 'Error'));
       refresh();
+    }
+
+    function copyPath() {
+      const path = document.getElementById('cli-path').textContent;
+      if (!path || path === '(not found)') return;
+      navigator.clipboard.writeText(path).then(() => {
+        const btn = document.getElementById('copy-path-btn');
+        btn.classList.add('copied');
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+        }, 2000);
+      });
     }
 
     refresh();
