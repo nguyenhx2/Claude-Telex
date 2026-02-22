@@ -21,11 +21,11 @@ func Run(srv *settings.Server) {
 func onReady(srv *settings.Server) {
 	setIcon(state.Get().Enabled)
 	systray.SetTitle("Claude TELEX")
-	systray.SetTooltip("Claude TELEX — Vietnamese IME Fix")
+	systray.SetTooltip("Claude TELEX - Vietnamese IME Fix")
 
-	mSettings := systray.AddMenuItem("⚙  Mở cài đặt / Settings", "")
+	mSettings := systray.AddMenuItem("\u2699  Settings", "Open Settings UI")
 	systray.AddSeparator()
-	mQuit := systray.AddMenuItem("✕  Thoát / Quit", "")
+	mQuit := systray.AddMenuItem("\u2715  Quit", "")
 
 	go func() {
 		for {
@@ -51,9 +51,9 @@ func setIcon(enabled bool) {
 	}
 	systray.SetIcon(iconBytes)
 
-	tooltip := "Claude TELEX — Vietnamese IME Fix [TẮT]"
+	tooltip := "Claude TELEX - Vietnamese IME Fix [OFF]"
 	if enabled {
-		tooltip = "Claude TELEX — Vietnamese IME Fix [BẬT]"
+		tooltip = "Claude TELEX - Vietnamese IME Fix [ON]"
 	}
 	systray.SetTooltip(tooltip)
 }
@@ -79,7 +79,7 @@ func startupPatch() {
 	if patcher.IsPatched(path) {
 		ver := patcher.ClaudeVersion(path)
 		if ver != st.LastPatchedVersion {
-			log.Printf("version changed %s→%s, re-patching", st.LastPatchedVersion, ver)
+			log.Printf("version changed %s->%s, re-patching", st.LastPatchedVersion, ver)
 			_ = patcher.Restore(path)
 			if err := patcher.Patch(path); err == nil {
 				state.Update(func(s *state.State) { s.LastPatchedVersion = ver })
@@ -117,6 +117,6 @@ func TogglePatch() {
 	}
 	state.Update(func(s *state.State) { s.Enabled = enabled })
 	setIcon(enabled)
-	msg := fmt.Sprintf("Vietnamese Fix: %s", map[bool]string{true: "BẬT ✓", false: "TẮT"}[enabled])
+	msg := fmt.Sprintf("Vietnamese Fix: %s", map[bool]string{true: "ON \u2713", false: "OFF"}[enabled])
 	systray.SetTooltip(msg)
 }

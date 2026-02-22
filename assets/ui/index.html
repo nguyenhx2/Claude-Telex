@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Claude TELEX — Cài đặt</title>
+  <title>Claude Telex — Settings</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -201,6 +201,19 @@
       font-family: 'Consolas', monospace;
     }
 
+    /* OS chip */
+    .os-chip {
+      background: rgba(139, 92, 246, .12);
+      color: #a78bfa;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-family: 'Consolas', monospace;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
     /* Toggle switch */
     .toggle {
       position: relative;
@@ -321,10 +334,18 @@
     .footer a {
       color: var(--blue);
       text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
     }
 
     .footer a:hover {
       text-decoration: underline;
+    }
+
+    .footer a svg {
+      opacity: .7;
+      flex-shrink: 0;
     }
 
     .kbd {
@@ -345,8 +366,8 @@
   <div class="header">
     <div class="header-icon" id="hdr-icon">VN</div>
     <div class="header-text">
-      <h1>Claude TELEX</h1>
-      <p>Vietnamese IME Fix for Claude Code CLI</p>
+      <h1>Claude Telex ⌨️</h1>
+      <p>Vietnamese TELEX Support for Claude Code CLI</p>
     </div>
   </div>
 
@@ -359,7 +380,7 @@
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg>
-        Trạng thái / Status
+        Status
       </div>
 
       <div class="row">
@@ -367,9 +388,9 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
-          Bản vá / Patch
+          Patch
         </div>
-        <span id="patch-badge" class="badge unpatched"><span class="dot"></span>Đang kiểm tra…</span>
+        <span id="patch-badge" class="badge unpatched"><span class="dot"></span>Checking…</span>
       </div>
 
       <div class="row">
@@ -378,9 +399,21 @@
             <path
               d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
           </svg>
-          Phiên bản / Version
+          Claude Code Version
         </div>
-        <span id="version" class="version-chip">—</span>
+        <span id="version" class="version-chip">-</span>
+      </div>
+
+      <div class="row">
+        <div class="row-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+          Operating System
+        </div>
+        <span id="os-info" class="os-chip">-</span>
       </div>
 
       <div class="row" style="flex-direction:column;align-items:flex-start">
@@ -388,9 +421,9 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
-          Đường dẫn / Path
+          CLI Path
         </div>
-        <div id="cli-path" class="row-sub">—</div>
+        <div id="cli-path" class="row-sub">-</div>
       </div>
     </div>
 
@@ -401,7 +434,7 @@
           <circle cx="12" cy="12" r="3" />
           <path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93" />
         </svg>
-        Tùy chọn / Options
+        Options
       </div>
 
       <div class="row">
@@ -410,9 +443,9 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
             </svg>
-            Bật vá lỗi
+            Enable Fix
           </div>
-          <div class="row-sub">Phím tắt: <span class="kbd">Ctrl</span>+<span class="kbd">Alt</span>+<span
+          <div class="row-sub">Hotkey: <span class="kbd">Ctrl</span>+<span class="kbd">Alt</span>+<span
               class="kbd">V</span></div>
         </div>
         <label class="toggle">
@@ -429,9 +462,9 @@
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
-            Khởi động cùng hệ thống
+            Start with System
           </div>
-          <div class="row-sub">Chạy ngầm khi bật máy</div>
+          <div class="row-sub">Run in background on startup</div>
         </div>
         <label class="toggle">
           <input type="checkbox" id="toggle-autostart" onchange="toggleAutostart(this.checked)">
@@ -448,12 +481,19 @@
         <path d="M23 4v6h-6M1 20v-6h6" />
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
       </svg>
-      Re-patch ngay
+      Re-patch Now
     </button>
   </div>
 
   <div class="footer">
-    <span><a href="https://github.com/nguyenhx2/claude-telex" target="_blank">github.com/nguyenhx2/claude-telex</a></span>
+    <a href="https://github.com/nguyenhx2/Claude-Telex" target="_blank">
+      <!-- GitHub icon -->
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+      </svg>
+      github.com/nguyenhx2/Claude-Telex
+    </a>
     <span id="foot-ver" style="color:var(--muted)">v1.0.0</span>
   </div>
 
@@ -483,15 +523,16 @@
       const badge = document.getElementById('patch-badge');
       if (s.patched && s.enabled) {
         badge.className = 'badge patched';
-        badge.innerHTML = '<span class="dot"></span>Đã vá ✓';
+        badge.innerHTML = '<span class="dot"></span>Patched ✓';
         icon.className = 'header-icon';
       } else {
         badge.className = 'badge unpatched';
-        badge.innerHTML = s.patched ? '<span class="dot"></span>Đã vá (tạm tắt)' : '<span class="dot"></span>Chưa vá';
+        badge.innerHTML = s.patched ? '<span class="dot"></span>Patched (disabled)' : '<span class="dot"></span>Not patched';
         icon.className = 'header-icon off';
       }
-      document.getElementById('version').textContent = s.version || '—';
-      document.getElementById('cli-path').textContent = s.path || '(không tìm thấy)';
+      document.getElementById('version').textContent = s.version || '-';
+      document.getElementById('os-info').textContent = s.os || '-';
+      document.getElementById('cli-path').textContent = s.path || '(not found)';
       document.getElementById('cli-path').title = s.path || '';
       document.getElementById('toggle-enabled').checked = s.enabled;
       document.getElementById('toggle-autostart').checked = s.autostart;
@@ -499,21 +540,21 @@
 
     async function toggleEnabled(v) {
       await api('/toggle', { enabled: v });
-      toast(v ? '✓ Đã bật bản vá' : '⏸ Đã tắt bản vá');
+      toast(v ? '✓ Fix enabled' : '⏸ Fix disabled');
       refresh();
     }
 
     async function toggleAutostart(v) {
       const r = await api('/autostart', { enabled: v });
       toast(r.ok
-        ? (v ? '✓ Sẽ tự chạy khi khởi động máy' : '⏸ Đã tắt khởi động cùng hệ thống')
-        : '✗ ' + (r.error || 'Lỗi'));
+        ? (v ? '✓ Will start with system' : '⏸ Autostart disabled')
+        : '\u2717 ' + (r.error || 'Error'));
     }
 
     async function repatch() {
-      toast('Đang patch…');
+      toast('Patching…');
       const r = await api('/patch');
-      toast(r.ok ? '✓ Patch thành công!' : '✗ ' + (r.error || 'Lỗi'));
+      toast(r.ok ? '✓ Patched successfully!' : '\u2717 ' + (r.error || 'Error'));
       refresh();
     }
 
