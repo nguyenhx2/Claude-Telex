@@ -155,18 +155,21 @@ func TestPatch_AlternateVariableNames(t *testing.T) {
 		t.Error("patch marker not found")
 	}
 
-	// Verify the fix uses the correct (alternate) var names
+	// Verify the fix uses correct input/update var names but local _s for state
 	if !strings.Contains(src, "for(const _c of abc)") {
 		t.Error("fix should use input var 'abc'")
 	}
-	if !strings.Contains(src, "xyz=xyz.backspace()") {
-		t.Error("fix should use state var 'xyz'")
+	if !strings.Contains(src, "let _s=QR7") {
+		t.Error("fix should declare local _s from curState 'QR7'")
 	}
-	if !strings.Contains(src, "fn1(xyz.text)") {
-		t.Error("fix should use updateText func 'fn1'")
+	if !strings.Contains(src, "_s=_s.backspace()") {
+		t.Error("fix should use local _s for backspace")
 	}
-	if !strings.Contains(src, "fn2(xyz.offset)") {
-		t.Error("fix should use updateOfs func 'fn2'")
+	if !strings.Contains(src, "fn1(_s.text)") {
+		t.Error("fix should use updateText func 'fn1' with _s")
+	}
+	if !strings.Contains(src, "fn2(_s.offset)") {
+		t.Error("fix should use updateOfs func 'fn2' with _s")
 	}
 }
 
@@ -389,14 +392,14 @@ func TestGenerateFix_SequentialProcessing(t *testing.T) {
 		t.Error("fix must check each char for \\x7f")
 	}
 
-	// Must call .backspace() on state
-	if !strings.Contains(fix, "e3=e3.backspace()") {
-		t.Error("fix must call .backspace() on state var")
+	// Must call .backspace() on local _s variable
+	if !strings.Contains(fix, "_s=_s.backspace()") {
+		t.Error("fix must call .backspace() on local _s var")
 	}
 
-	// Must call .insert() on state
-	if !strings.Contains(fix, "e3=e3.insert(_c)") {
-		t.Error("fix must call .insert() on state var")
+	// Must call .insert() on local _s variable
+	if !strings.Contains(fix, "_s=_s.insert(_c)") {
+		t.Error("fix must call .insert() on local _s var")
 	}
 }
 
@@ -407,11 +410,11 @@ func TestGenerateFix_UpdatesTextAndOffset(t *testing.T) {
 	}
 	fix := generateFix(v)
 
-	if !strings.Contains(fix, "h7(e3.text)") {
-		t.Error("fix must call updateText with new state text")
+	if !strings.Contains(fix, "h7(_s.text)") {
+		t.Error("fix must call updateText with _s.text")
 	}
-	if !strings.Contains(fix, "S5(e3.offset)") {
-		t.Error("fix must call updateOfs with new state offset")
+	if !strings.Contains(fix, "S5(_s.offset)") {
+		t.Error("fix must call updateOfs with _s.offset")
 	}
 }
 
@@ -422,9 +425,9 @@ func TestGenerateFix_ComparesWithSnapshot(t *testing.T) {
 	}
 	fix := generateFix(v)
 
-	// Must compare snapshot (curState) with modified state
-	if !strings.Contains(fix, "!J6.equals(e3)") {
-		t.Error("fix must compare curState.equals(state)")
+	// Must compare snapshot (curState) with local _s
+	if !strings.Contains(fix, "!J6.equals(_s)") {
+		t.Error("fix must compare curState.equals(_s)")
 	}
 }
 
@@ -599,10 +602,10 @@ func TestPatch_SingleCharBackspace(t *testing.T) {
 	fix := generateFix(v)
 
 	// With a single \x7f in the for..of loop:
-	// - _c === "\x7f" -> st = st.backspace()
+	// - _c === "\x7f" -> _s = _s.backspace()
 	// That's it. No batch counting needed.
-	if !strings.Contains(fix, "st=st.backspace()") {
-		t.Error("fix must handle single backspace via state.backspace()")
+	if !strings.Contains(fix, "_s=_s.backspace()") {
+		t.Error("fix must handle single backspace via _s.backspace()")
 	}
 }
 
@@ -617,7 +620,7 @@ func TestPatch_MixedCharsAndBackspaces(t *testing.T) {
 	fix := generateFix(v)
 
 	// Verify sequential processing pattern: backspace OR insert for each char
-	if !strings.Contains(fix, `if(_c==="\x7f"){s=s.backspace();}else{s=s.insert(_c);}`) {
+	if !strings.Contains(fix, `if(_c==="\x7f"){_s=_s.backspace();}else{_s=_s.insert(_c);}`) {
 		t.Error("fix must handle mixed ⌫ and chars with if/else per character")
 	}
 }

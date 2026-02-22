@@ -222,30 +222,34 @@ func extractVariables(block string) (*variables, error) {
 
 // generateFix produces the replacement JavaScript code.
 // It processes each character sequentially: \x7f → backspace(), else → insert().
+//
+// IMPORTANT: We use a locally-scoped variable `_s` (declared with `let`) instead of
+// reusing the minified state variable name. In minified JS, the same short name
+// (e.g. `e3`) may exist in the outer/parent scope as a completely different variable.
+// Assigning without `let` would corrupt that outer variable, causing subsequent
+// onInput calls to malfunction (e.g. the second Vietnamese word typed breaks).
 func generateFix(v *variables) string {
 	return fmt.Sprintf(
 		`%s`+
 			`if(%s.includes("\x7f")){`+
-			`%s=%s;`+
+			`let _s=%s;`+
 			`for(const _c of %s){`+
-			`if(_c==="\x7f"){%s=%s.backspace();}`+
-			`else{%s=%s.insert(_c);}`+
+			`if(_c==="\x7f"){_s=_s.backspace();}`+
+			`else{_s=_s.insert(_c);}`+
 			`}`+
-			`if(!%s.equals(%s)){`+
-			`if(%s.text!==%s.text)`+
-			`%s(%s.text);`+
-			`%s(%s.offset)`+
+			`if(!%s.equals(_s)){`+
+			`if(%s.text!==_s.text)`+
+			`%s(_s.text);`+
+			`%s(_s.offset)`+
 			`}return;}`,
 		patchMarker,
 		v.input,
-		v.state, v.curState,
+		v.curState,
 		v.input,
-		v.state, v.state,
-		v.state, v.state,
-		v.curState, v.state,
-		v.curState, v.state,
-		v.updateText, v.state,
-		v.updateOfs, v.state,
+		v.curState,
+		v.curState,
+		v.updateText,
+		v.updateOfs,
 	)
 }
 
