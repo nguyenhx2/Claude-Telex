@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/nguyenhx2/claude-telex/assets/ui"
 	"github.com/nguyenhx2/claude-telex/internal/autostart"
@@ -143,8 +144,7 @@ func handleStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, resp)
 }
 
-// osInfo returns a human-readable OS string, e.g. "Windows 11", "macOS 14.4", "Linux (Ubuntu 22.04)".
-func osInfo() string {
+var osInfo = sync.OnceValue(func() string {
 	switch runtime.GOOS {
 	case "windows":
 		if out, err := exec.Command("cmd", "/c", "ver").Output(); err == nil {
@@ -180,7 +180,7 @@ func osInfo() string {
 		}
 		return "Linux"
 	}
-}
+})
 
 func handleToggle(w http.ResponseWriter, r *http.Request) {
 	var req struct{ Enabled bool }
