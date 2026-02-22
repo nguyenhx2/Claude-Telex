@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Claude Telex — Settings</title>
+  <title>Claude Telex - Settings</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -15,11 +15,15 @@
       --border: #1e2d45;
       --text: #f0f4ff;
       --muted: #6b7a9e;
-      --green: #E87040;
-      --green-dim: rgba(232, 112, 64, .12);
+      --accent: #E87040;
+      --accent-dim: rgba(232, 112, 64, .12);
+      --green: #22c55e;
+      --green-dim: rgba(34, 197, 94, .12);
       --red: #f43f5e;
       --blue: #3b82f6;
-      --blue-dim: rgba(59, 130, 246, .15);
+      --blue-dim: rgba(59, 130, 246, .12);
+      --purple: #a78bfa;
+      --purple-dim: rgba(167, 139, 250, .12);
       --radius: 14px;
       --radius-sm: 8px;
     }
@@ -37,11 +41,10 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      padding: 0;
       font-size: 13.5px;
     }
 
-    /* Gradient header */
+    /* ─── Header ─── */
     .header {
       background: linear-gradient(135deg, #0f1f3d 0%, #0d1b30 60%, #111827 100%);
       border-bottom: 1px solid var(--border);
@@ -91,7 +94,7 @@
       gap: 14px;
     }
 
-    /* Cards */
+    /* ─── Cards ─── */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -116,7 +119,7 @@
       opacity: .5;
     }
 
-    /* Row inside card */
+    /* ─── Row ─── */
     .row {
       display: flex;
       align-items: center;
@@ -160,7 +163,7 @@
       max-width: 340px;
     }
 
-    /* Status badge */
+    /* ─── Badges & Chips ─── */
     .badge {
       display: inline-flex;
       align-items: center;
@@ -190,23 +193,9 @@
       background: currentColor;
     }
 
-    /* Version chip */
-    .version-chip {
-      background: var(--blue-dim);
-      color: var(--blue);
-      font-size: 11.5px;
-      font-weight: 600;
-      padding: 3px 10px;
-      border-radius: 99px;
-      font-family: 'Consolas', monospace;
-    }
-
-    /* OS chip */
-    .os-chip {
-      background: rgba(139, 92, 246, .12);
-      color: #a78bfa;
+    .chip {
       font-size: 11px;
-      font-weight: 500;
+      font-weight: 600;
       padding: 3px 10px;
       border-radius: 99px;
       font-family: 'Consolas', monospace;
@@ -214,7 +203,17 @@
       flex-shrink: 0;
     }
 
-    /* Toggle switch */
+    .chip-blue {
+      background: var(--blue-dim);
+      color: var(--blue);
+    }
+
+    .chip-purple {
+      background: var(--purple-dim);
+      color: var(--purple);
+    }
+
+    /* ─── Toggle ─── */
     .toggle {
       position: relative;
       width: 42px;
@@ -252,20 +251,26 @@
     }
 
     input:checked+.slider {
-      background: var(--green);
+      background: var(--accent);
     }
 
     input:checked+.slider::before {
       transform: translateX(18px);
     }
 
-    /* Button */
-    .btn {
+    /* ─── Action Bar ─── */
+    .actions {
+      padding: 0 24px 16px;
       display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 7px;
-      padding: 12px;
+      gap: 6px;
+      padding: 10px 24px;
       border: none;
       border-radius: var(--radius-sm);
       font: inherit;
@@ -273,19 +278,19 @@
       font-weight: 600;
       cursor: pointer;
       transition: all .15s;
-      width: 100%;
+      white-space: nowrap;
     }
 
     .btn-primary {
       background: linear-gradient(135deg, var(--blue), #2563eb);
       color: white;
-      box-shadow: 0 4px 12px rgba(59, 130, 246, .3);
+      box-shadow: 0 3px 10px rgba(59, 130, 246, .25);
     }
 
     .btn-primary:hover {
       opacity: .9;
       transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(59, 130, 246, .35);
+      box-shadow: 0 5px 14px rgba(59, 130, 246, .3);
     }
 
     .btn-primary:active {
@@ -293,11 +298,42 @@
       transform: translateY(0);
     }
 
-    .actions {
-      padding: 0 24px 20px;
+    /* ─── Footer ─── */
+    .footer {
+      padding: 10px 24px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
     }
 
-    /* Toast */
+    .footer-link {
+      color: var(--muted);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 500;
+      transition: color .15s;
+    }
+
+    .footer-link:hover {
+      color: var(--text);
+    }
+
+    .footer-link svg {
+      flex-shrink: 0;
+    }
+
+    .footer-ver {
+      font-size: 10.5px;
+      color: var(--muted);
+      opacity: .6;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* ─── Toast ─── */
     #toast {
       position: fixed;
       bottom: 20px;
@@ -321,33 +357,6 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    /* Footer */
-    .footer {
-      padding: 12px 24px 20px;
-      font-size: 11px;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .footer a {
-      color: var(--blue);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .footer a:hover {
-      text-decoration: underline;
-    }
-
-    .footer a svg {
-      opacity: .7;
-      flex-shrink: 0;
-    }
-
     .kbd {
       display: inline-block;
       background: var(--surface2);
@@ -366,14 +375,14 @@
   <div class="header">
     <div class="header-icon" id="hdr-icon">VN</div>
     <div class="header-text">
-      <h1>Claude Telex ⌨️</h1>
+      <h1>Claude Telex</h1>
       <p>Vietnamese TELEX Support for Claude Code CLI</p>
     </div>
   </div>
 
   <div class="content">
 
-    <!-- Status card -->
+    <!-- Status -->
     <div class="card">
       <div class="card-header">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -399,9 +408,9 @@
             <path
               d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
           </svg>
-          Claude Code Version
+          Claude Code
         </div>
-        <span id="version" class="version-chip">-</span>
+        <span id="version" class="chip chip-blue">-</span>
       </div>
 
       <div class="row">
@@ -411,9 +420,9 @@
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
           </svg>
-          Operating System
+          OS
         </div>
-        <span id="os-info" class="os-chip">-</span>
+        <span id="os-info" class="chip chip-purple">-</span>
       </div>
 
       <div class="row" style="flex-direction:column;align-items:flex-start">
@@ -427,7 +436,7 @@
       </div>
     </div>
 
-    <!-- Options card -->
+    <!-- Options -->
     <div class="card">
       <div class="card-header">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -473,28 +482,27 @@
       </div>
     </div>
 
-  </div><!-- .content -->
+  </div>
 
   <div class="actions">
     <button class="btn btn-primary" onclick="repatch()">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M23 4v6h-6M1 20v-6h6" />
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
       </svg>
-      Re-patch Now
+      Re-patch
     </button>
   </div>
 
   <div class="footer">
-    <a href="https://github.com/nguyenhx2/Claude-Telex" target="_blank">
-      <!-- GitHub icon -->
+    <a class="footer-link" href="https://github.com/nguyenhx2/Claude-Telex" target="_blank">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
         <path
           d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
       </svg>
-      github.com/nguyenhx2/Claude-Telex
+      nguyenhx2/Claude-Telex
     </a>
-    <span id="foot-ver" style="color:var(--muted)">v1.0.0</span>
+    <span class="footer-ver" id="foot-ver">v1.0.0</span>
   </div>
 
   <div id="toast"></div>
@@ -527,7 +535,9 @@
         icon.className = 'header-icon';
       } else {
         badge.className = 'badge unpatched';
-        badge.innerHTML = s.patched ? '<span class="dot"></span>Patched (disabled)' : '<span class="dot"></span>Not patched';
+        badge.innerHTML = s.patched
+          ? '<span class="dot"></span>Patched (disabled)'
+          : '<span class="dot"></span>Not patched';
         icon.className = 'header-icon off';
       }
       document.getElementById('version').textContent = s.version || '-';
@@ -548,13 +558,13 @@
       const r = await api('/autostart', { enabled: v });
       toast(r.ok
         ? (v ? '✓ Will start with system' : '⏸ Autostart disabled')
-        : '\u2717 ' + (r.error || 'Error'));
+        : '✗ ' + (r.error || 'Error'));
     }
 
     async function repatch() {
       toast('Patching…');
       const r = await api('/patch');
-      toast(r.ok ? '✓ Patched successfully!' : '\u2717 ' + (r.error || 'Error'));
+      toast(r.ok ? '✓ Patched successfully!' : '✗ ' + (r.error || 'Error'));
       refresh();
     }
 

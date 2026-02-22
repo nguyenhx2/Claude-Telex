@@ -8,9 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -144,43 +142,8 @@ func handleStatus(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, resp)
 }
 
-var osInfo = sync.OnceValue(func() string {
-	switch runtime.GOOS {
-	case "windows":
-		if out, err := exec.Command("cmd", "/c", "ver").Output(); err == nil {
-			line := strings.TrimSpace(string(out))
-			// "Microsoft Windows [Version 10.0.22631.xxxx]"
-			if i := strings.Index(line, "Version "); i != -1 {
-				ver := strings.Trim(line[i+8:], "]")
-				parts := strings.Split(ver, ".")
-				if len(parts) >= 3 {
-					build, _ := strconv.Atoi(parts[2])
-					name := "10"
-					if build >= 22000 {
-						name = "11"
-					}
-					return fmt.Sprintf("Windows %s (build %s)", name, parts[2])
-				}
-			}
-		}
-		return "Windows"
-	case "darwin":
-		if out, err := exec.Command("sw_vers", "-productVersion").Output(); err == nil {
-			return "macOS " + strings.TrimSpace(string(out))
-		}
-		return "macOS"
-	default:
-		// Linux: try /etc/os-release
-		if data, err := os.ReadFile("/etc/os-release"); err == nil {
-			for _, line := range strings.Split(string(data), "\n") {
-				if strings.HasPrefix(line, "PRETTY_NAME=") {
-					return strings.Trim(line[12:], `"`)
-				}
-			}
-		}
-		return "Linux"
-	}
-})
+// osInfo caches the result of osInfoPlatform() so it's computed only once.
+var osInfo = sync.OnceValue(osInfoPlatform)
 
 func handleToggle(w http.ResponseWriter, r *http.Request) {
 	var req struct{ Enabled bool }
