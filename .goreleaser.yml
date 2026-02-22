@@ -1,0 +1,87 @@
+version: 2
+
+project_name: claude-telex
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: claude-telex-windows
+    main: ./cmd/claude-telex
+    binary: claude-telex
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X main.version={{.Version}} -H windowsgui
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+  - id: claude-telex-darwin
+    main: ./cmd/claude-telex
+    binary: claude-telex
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+  - id: claude-telex-linux
+    main: ./cmd/claude-telex
+    binary: claude-telex
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: archive
+    builds: [claude-telex-windows, claude-telex-darwin, claude-telex-linux]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+release:
+  github:
+    owner: nguyenhx2
+    name: Claude-Telex
+  draft: false
+  prerelease: auto
+  name_template: "v{{ .Version }}"
+  header: |
+    ## Claude TELEX {{ .Version }}
+    Vietnamese TELEX Input Fix for Claude Code CLI.
+
+    ### Quick Install
+    **Windows**: `irm https://raw.githubusercontent.com/nguyenhx2/Claude-Telex/main/install.ps1 | iex`
+    **macOS/Linux**: `curl -fsSL https://raw.githubusercontent.com/nguyenhx2/Claude-Telex/main/install.sh | bash`
+  footer: |
+    **Full Changelog**: https://github.com/nguyenhx2/Claude-Telex/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^ci:"

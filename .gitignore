@@ -1,0 +1,11 @@
+# .gitignore
+*.exe
+*.dll
+*.so
+*.dylib
+dist/
+*.bak
+test_*.ico
+
+*.code-workspace
+*~

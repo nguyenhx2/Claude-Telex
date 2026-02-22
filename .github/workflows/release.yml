@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+          - os: macos-latest
+            goos: darwin
+          - os: windows-latest
+            goos: windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Linux build deps
+        if: matrix.goos == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y gcc libgtk-3-dev libappindicator3-dev
+
+      - name: Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            CGO_ENABLED=0 go build -ldflags="-s -w -H windowsgui -X main.version=${{ github.ref_name }}" -o claude-telex.exe ./cmd/claude-telex
+          elif [ "${{ matrix.goos }}" = "darwin" ]; then
+            CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o claude-telex ./cmd/claude-telex
+          else
+            CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o claude-telex ./cmd/claude-telex
+          fi
+
+      - name: Package (Windows)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: Compress-Archive -Path claude-telex.exe,README.md,LICENSE -DestinationPath "claude-telex_${{ github.ref_name }}_windows_amd64.zip"
+
+      - name: Package (Unix)
+        if: matrix.goos != 'windows'
+        run: tar czf "claude-telex_${{ github.ref_name }}_${{ matrix.goos }}_$(uname -m).tar.gz" claude-telex README.md LICENSE
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.goos }}
+          path: claude-telex_*
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create checksums
+        run: sha256sum claude-telex_* > checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            claude-telex_*
+            checksums.txt
+          generate_release_notes: true
+          body: |
+            ## Claude TELEX ${{ github.ref_name }}
+            Vietnamese TELEX Input Fix for Claude Code CLI.
+
+            ### Quick Install
+            **Windows**: `irm https://raw.githubusercontent.com/nguyenhx2/Claude-Telex/main/install.ps1 | iex`
+            **macOS/Linux**: `curl -fsSL https://raw.githubusercontent.com/nguyenhx2/Claude-Telex/main/install.sh | bash`

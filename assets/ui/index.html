@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Claude TELEX — Cài đặt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0f1e;
+      --surface: #111827;
+      --surface2: #1a2235;
+      --border: #1e2d45;
+      --text: #f0f4ff;
+      --muted: #6b7a9e;
+      --green: #E87040;
+      --green-dim: rgba(232, 112, 64, .12);
+      --red: #f43f5e;
+      --blue: #3b82f6;
+      --blue-dim: rgba(59, 130, 246, .15);
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0;
+      font-size: 13.5px;
+    }
+
+    /* Gradient header */
+    .header {
+      background: linear-gradient(135deg, #0f1f3d 0%, #0d1b30 60%, #111827 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 24px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .header-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #E87040, #D4623A);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 15px;
+      color: white;
+      letter-spacing: -.5px;
+      box-shadow: 0 4px 16px rgba(232, 112, 64, .3);
+      flex-shrink: 0;
+    }
+
+    .header-icon.off {
+      background: linear-gradient(135deg, #374151, #1f2937);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, .3);
+    }
+
+    .header-text h1 {
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .header-text p {
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .content {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .card-header svg {
+      opacity: .5;
+    }
+
+    /* Row inside card */
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+
+    .row:last-child {
+      border-bottom: none;
+    }
+
+    .row-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .row-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .row-label svg {
+      opacity: .6;
+      flex-shrink: 0;
+    }
+
+    .row-sub {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'Consolas', monospace;
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 340px;
+    }
+
+    /* Status badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .badge.patched {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    .badge.unpatched {
+      background: rgba(148, 163, 184, .1);
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Version chip */
+    .version-chip {
+      background: var(--blue-dim);
+      color: var(--blue);
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 99px;
+      font-family: 'Consolas', monospace;
+    }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 99px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+
+    .slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: white;
+      left: 3px;
+      top: 3px;
+      transition: transform .2s;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
+    }
+
+    input:checked+.slider {
+      background: var(--green);
+    }
+
+    input:checked+.slider::before {
+      transform: translateX(18px);
+    }
+
+    /* Button */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      width: 100%;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--blue), #2563eb);
+      color: white;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, .3);
+    }
+
+    .btn-primary:hover {
+      opacity: .9;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(59, 130, 246, .35);
+    }
+
+    .btn-primary:active {
+      opacity: .8;
+      transform: translateY(0);
+    }
+
+    .actions {
+      padding: 0 24px 20px;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all .25s ease;
+      white-space: nowrap;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Footer */
+    .footer {
+      padding: 12px 24px 20px;
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer a {
+      color: var(--blue);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .kbd {
+      display: inline-block;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: 'Consolas', monospace;
+      font-size: 10px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <div class="header-icon" id="hdr-icon">VN</div>
+    <div class="header-text">
+      <h1>Claude TELEX</h1>
+      <p>Vietnamese IME Fix for Claude Code CLI</p>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- Status card -->
+    <div class="card">
+      <div class="card-header">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+        Trạng thái / Status
+      </div>
+
+      <div class="row">
+        <div class="row-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          Bản vá / Patch
+        </div>
+        <span id="patch-badge" class="badge unpatched"><span class="dot"></span>Đang kiểm tra…</span>
+      </div>
+
+      <div class="row">
+        <div class="row-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path
+              d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+          </svg>
+          Phiên bản / Version
+        </div>
+        <span id="version" class="version-chip">—</span>
+      </div>
+
+      <div class="row" style="flex-direction:column;align-items:flex-start">
+        <div class="row-label">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+          </svg>
+          Đường dẫn / Path
+        </div>
+        <div id="cli-path" class="row-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Options card -->
+    <div class="card">
+      <div class="card-header">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93" />
+        </svg>
+        Tùy chọn / Options
+      </div>
+
+      <div class="row">
+        <div class="row-info">
+          <div class="row-label">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+            Bật vá lỗi
+          </div>
+          <div class="row-sub">Phím tắt: <span class="kbd">Ctrl</span>+<span class="kbd">Alt</span>+<span
+              class="kbd">V</span></div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-enabled" onchange="toggleEnabled(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="row">
+        <div class="row-info">
+          <div class="row-label">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            Khởi động cùng hệ thống
+          </div>
+          <div class="row-sub">Chạy ngầm khi bật máy</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-autostart" onchange="toggleAutostart(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+  </div><!-- .content -->
+
+  <div class="actions">
+    <button class="btn btn-primary" onclick="repatch()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M23 4v6h-6M1 20v-6h6" />
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+      </svg>
+      Re-patch ngay
+    </button>
+  </div>
+
+  <div class="footer">
+    <span><a href="https://github.com/nguyenhx2/claude-telex" target="_blank">github.com/nguyenhx2/claude-telex</a></span>
+    <span id="foot-ver" style="color:var(--muted)">v1.0.0</span>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    async function api(path, body) {
+      const r = await fetch('/api' + path, body
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+        : {});
+      return r.json();
+    }
+
+    function toast(msg, duration = 2500) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.classList.remove('show'), duration);
+    }
+
+    async function refresh() {
+      const s = await api('/status').catch(() => null);
+      if (!s) return;
+
+      const icon = document.getElementById('hdr-icon');
+      const badge = document.getElementById('patch-badge');
+      if (s.patched && s.enabled) {
+        badge.className = 'badge patched';
+        badge.innerHTML = '<span class="dot"></span>Đã vá ✓';
+        icon.className = 'header-icon';
+      } else {
+        badge.className = 'badge unpatched';
+        badge.innerHTML = s.patched ? '<span class="dot"></span>Đã vá (tạm tắt)' : '<span class="dot"></span>Chưa vá';
+        icon.className = 'header-icon off';
+      }
+      document.getElementById('version').textContent = s.version || '—';
+      document.getElementById('cli-path').textContent = s.path || '(không tìm thấy)';
+      document.getElementById('cli-path').title = s.path || '';
+      document.getElementById('toggle-enabled').checked = s.enabled;
+      document.getElementById('toggle-autostart').checked = s.autostart;
+    }
+
+    async function toggleEnabled(v) {
+      await api('/toggle', { enabled: v });
+      toast(v ? '✓ Đã bật bản vá' : '⏸ Đã tắt bản vá');
+      refresh();
+    }
+
+    async function toggleAutostart(v) {
+      const r = await api('/autostart', { enabled: v });
+      toast(r.ok
+        ? (v ? '✓ Sẽ tự chạy khi khởi động máy' : '⏸ Đã tắt khởi động cùng hệ thống')
+        : '✗ ' + (r.error || 'Lỗi'));
+    }
+
+    async function repatch() {
+      toast('Đang patch…');
+      const r = await api('/patch');
+      toast(r.ok ? '✓ Patch thành công!' : '✗ ' + (r.error || 'Lỗi'));
+      refresh();
+    }
+
+    refresh();
+    setInterval(refresh, 3000);
+  </script>
+</body>
+
+</html>
