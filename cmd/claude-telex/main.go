@@ -12,7 +12,12 @@ import (
 	"github.com/nguyenhx2/claude-telex/internal/tray"
 )
 
+// version is set via -ldflags "-X main.version=..."
+var version = "dev"
+
 func main() {
+	settings.AppVersion = version
+
 	// Must lock OS thread for systray (macOS requires main thread)
 	runtime.LockOSThread()
 

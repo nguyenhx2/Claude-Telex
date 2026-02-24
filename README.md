@@ -24,41 +24,39 @@ Khi gõ tiếng Việt bằng bộ gõ TELEX (EVKey, UniKey, GoTiengViet, [Gõ N
 
 > **Ví dụ:** Gõ `banj` mong đợi `bạn`, nhưng nhận được `bn` hoặc text bị lỗi.
 
-### Nguyên nhân gốc
+#### Tại sao lỗi xảy ra?
 
-Bộ gõ tiếng Việt hoạt động theo giao thức **backspace + thay thế**: gửi N × `\x7F` (xóa) rồi gửi ký tự thay thế. Hai vấn đề trong Claude Code:
+Bộ gõ tiếng Việt hoạt động bằng giao thức **xoá + thay thế**: gửi N ký tự xoá (`\x7F`) rồi gửi ký tự thay thế qua stdin. Claude Code (dựa trên React/Ink) gặp 3 vấn đề khi xử lý giao thức này:
 
-1. **Stale closure**: Hàm `G6` (onInput) đọc state `y` từ React closure — state này **không cập nhật** giữa các event trong một burst IME
-2. **Split events**: Ink tách burst thành nhiều G6 call riêng biệt — backspace và ký tự thay thế đến ở các call khác nhau
-3. **P6 dùng state cũ**: Hàm xử lý ký tự `P6(J6)(t)` capture state từ React render, không từ `__imeState` bridge
+| Vấn đề | Giải thích |
+|---|---|
+| **State cũ trong closure** | Hàm `onInput` đọc state từ React closure — state không cập nhật giữa các event trong cùng 1 burst |
+| **Tách event** | Ink tách burst thành nhiều lần gọi riêng biệt — xoá và thay thế xảy ra ở các lần gọi khác nhau |
+| **Hàm P6 dùng state lỗi** | Hàm xử lý ký tự `P6(J6)(t)` bắt state từ React render, không từ state đã được sửa |
 
-### Giải pháp — Engine-Aware Patch v9
+### Giải pháp
 
-Dựa trên phân tích kĩ [tài liệu kiến trúc của Gõ Nhanh](docs/core-engine-algorithm.md), Claude Telex **patch trực tiếp** vào `cli.js` với 4 thành phần:
+Claude Telex **patch trực tiếp** vào `cli.js`, chèn 4 handler trước logic gốc để xử lý đúng giao thức IME:
 
 ```mermaid
 flowchart LR
-    subgraph "Engine Protocol"
-        A["Gõ Nhanh: rats → rất"] --> B["Result{bs:2, chars:['ấ','t']}"]
-        B --> C["Stdin: ⌫⌫ + ất"]
+    subgraph "Giao thức bộ gõ"
+        A["Gõ: banj → bạn"] --> B["Gửi: ⌫⌫ + ạn"]
     end
-    subgraph "v9 Patch — 4 Handlers"
-        D["1. stateSync"] --> E["Khôi phục y từ __imeState"]
-        F["2. rawHandler"] --> G["Xử lý chunk nguyên: ⌫+chars"]
-        H["3. bsHandler"] --> I["Bắt backspace tách lẻ"]
-        J["4. charHandler ★"] --> K["Bắt ký tự thay thế tách lẻ"]
+    subgraph "Claude Telex — 4 Handlers"
+        C["stateSync"] --> D["Khôi phục state đúng"]
+        E["rawHandler"] --> F["Xử lý chunk nguyên"]
+        G["bsHandler"] --> H["Bắt backspace tách lẻ"]
+        I["charHandler"] --> J["Bắt ký tự thay thế"]
     end
 ```
 
-**Các chi tiết quan trọng:**
-
-| Thành phần | Mô tả |
+| Handler | Chức năng |
 |---|---|
-| `stateSync` | Khôi phục `y` từ `globalThis.__imeState`, clear khi React catch up hoặc control key |
-| `rawHandler` | Khi `\x7f` trong input → xử lý toàn bộ chunk atomically |
-| `bsHandler` | Khi Ink tách `\x7f` thành `backspace=true` → bridge state |
-| `charHandler` ★ | Khi `__imeState` active + ký tự bình thường → `y.insert()` trực tiếp, bypass `P6` (stale closure) |
-| Auto-upgrade | Tự phát hiện patch v1–v8 và nâng cấp |
+| **stateSync** | Khôi phục state từ `__imeState` bridge, tự xoá khi React đã cập nhật hoặc khi nhấn phím điều khiển |
+| **rawHandler** | Khi toàn bộ burst đến trong 1 chunk — xử lý nguyên khối |
+| **bsHandler** | Khi Ink tách `\x7F` thành sự kiện backspace riêng — bridge state |
+| **charHandler** | Khi ký tự thay thế đến sau backspace — dùng `insert()` trực tiếp, bỏ qua hàm P6 (state lỗi) |
 
 ### Cài đặt
 
@@ -85,7 +83,7 @@ go install github.com/nguyenhx2/claude-telex/cmd/claude-telex@latest
 Chạy `claude-telex` - app sẽ:
 
 1. 🔍 Tự động tìm `cli.js` của Claude Code
-2. 🩹 Patch logic xử lý IME (v9 engine-aware)
+2. 🩹 Patch logic xử lý IME
 3. 🖥️ Hiển thị icon ở system tray (cam = bật, xám = tắt)
 4. ⚙️ Mở Settings UI tại `http://127.0.0.1:9315`
 
@@ -103,6 +101,7 @@ Chạy `claude-telex` - app sẽ:
 | **EVKey** | Windows | ✅ Hỗ trợ đầy đủ |
 | **UniKey** | Windows | ✅ Hỗ trợ đầy đủ |
 | **GoTiengViet** | Windows / macOS | ✅ Hỗ trợ đầy đủ |
+| **[Gõ Nhanh](https://github.com/phucanh08/gonhanh)** | macOS | ✅ Hỗ trợ đầy đủ |
 | **ibus-bamboo** | Linux | ✅ Hỗ trợ đầy đủ |
 | Bộ gõ khác (gửi `\x7F`) | Tất cả | ✅ Hoạt động |
 
@@ -114,63 +113,6 @@ Chạy `claude-telex` - app sẽ:
 | 🪟 **Windows** | 10 / 11 (amd64, arm64) | ✅ Hỗ trợ |
 | 🍎 **macOS** | 12 Monterey+ (Intel & Apple Silicon) | ✅ Hỗ trợ |
 | 🐧 **Linux** | Ubuntu 20.04+, Fedora 36+, Arch (amd64, arm64) | ✅ Hỗ trợ |
-
-### Kiến trúc
-
-```mermaid
-graph TD
-    subgraph "⌨️ Claude Telex Binary"
-        M[main.go] --> T[tray<br/>System Tray Icon]
-        M --> S[settings<br/>HTTP Server :9315]
-        M --> HK[hotkey<br/>Ctrl+Alt+V]
-        
-        T --> P[patcher<br/>Find & Patch cli.js]
-        T --> IC[icon<br/>ICO/PNG Generator]
-        S --> P
-        S --> AS[autostart<br/>Registry/LaunchAgent/XDG]
-        S --> ST[state<br/>JSON Config]
-        S --> OI[osinfo<br/>Platform-specific]
-    end
-    
-    S --> |serves| UI[Settings UI<br/>index.html]
-    P --> |patches| CLI[Claude Code<br/>cli.js]
-    IC --> |renders| TRAY[System Tray<br/>🟠 On / ⚪ Off]
-    OI --> |Win: Registry<br/>Mac: sw_vers<br/>Lin: /etc/os-release| OS[OS Info]
-```
-
-#### Tổng quan Package
-
-| Package | Chức năng |
-|---|---|
-| `cmd/claude-telex` | Entry point, single-instance lock, orchestration |
-| `internal/patcher` | Tìm `cli.js`, trích xuất biến động bằng regex, inject fix v9 (engine-aware) |
-| `internal/tray` | System tray (ICO trên Windows, PNG trên macOS/Linux) |
-| `internal/settings` | HTTP server tại port 9315, JSON API |
-| `internal/icon` | Vẽ icon programmatically (vòng tròn + chữ "VN") |
-| `internal/hotkey` | Global hotkey `Ctrl+Alt+V` |
-| `internal/autostart` | Tự khởi động: Windows Registry / macOS LaunchAgent / Linux XDG |
-| `internal/state` | Lưu config JSON tại `~/.claude-telex/config.json` |
-| `assets/ui` | Embedded HTML Settings UI (dark theme, Inter font) |
-
-### Luồng Patching (v9)
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant CT as ⌨️ Claude Telex
-    participant JS as cli.js
-
-    U->>CT: Launch
-    CT->>JS: FindCliJS()
-    CT->>JS: ReadFile()
-    CT->>CT: Legacy patch (v1-v8)?<br/>→ Restore backup, rồi re-patch
-    CT->>CT: findBugBlock()<br/>Tìm .includes("\x7f")
-    CT->>CT: extractVariables()<br/>Regex: input, keyInfo, curState,<br/>updateText, updateOfs, cleanup1/2
-    CT->>CT: generateFix()<br/>stateSync + rawHandler +<br/>bsHandler + charHandler
-    CT->>JS: Inject fix TRƯỚC early-return guard
-    CT->>JS: WriteFile() + Verify marker
-    CT-->>U: ✅ Patched v9! System tray 🟠
-```
 
 ### Build & Chạy
 
@@ -190,42 +132,12 @@ cd Claude-Telex
 # Build binary
 go build -ldflags="-s -w -H windowsgui" -o claude-telex.exe ./cmd/claude-telex   # Windows
 go build -ldflags="-s -w" -o claude-telex ./cmd/claude-telex                      # macOS / Linux
-
-# Hoặc dùng Make
-make build
-```
-
-#### Stop & Restart (Development — Windows)
-
-```powershell
-# Stop app đang chạy
-Get-Process claude-telex -ErrorAction SilentlyContinue | Stop-Process -Force
-
-# Build lại và chạy
-go build -ldflags="-s -w -H windowsgui" -o claude-telex.exe ./cmd/claude-telex && `
-  Start-Process -FilePath ".\claude-telex.exe" -WindowStyle Hidden
-
-# Stop + Build + Restart trong một lệnh
-Get-Process claude-telex -ErrorAction SilentlyContinue | Stop-Process -Force; `
-  go build -ldflags="-s -w -H windowsgui" -o claude-telex.exe ./cmd/claude-telex && `
-  Start-Process -FilePath ".\claude-telex.exe" -WindowStyle Hidden
 ```
 
 #### Chạy (Development)
 
 ```bash
-# Chạy trực tiếp (có console output)
 go run ./cmd/claude-telex
-
-# Chạy binary đã build
-./claude-telex        # macOS / Linux
-.\claude-telex.exe    # Windows
-```
-
-#### Release (snapshot)
-
-```bash
-goreleaser release --snapshot --clean
 ```
 
 ---
@@ -240,41 +152,39 @@ When typing Vietnamese using TELEX IME (EVKey, UniKey, GoTiengViet, [Gõ Nhanh](
 
 > **Example:** Typing `banj` expecting `bạn`, but getting `bn` or garbled text.
 
-### Root Cause
+#### Why does this happen?
 
-Vietnamese IMEs use a **backspace + replace** protocol: send N × `\x7F` (delete) then replacement chars. Two issues in Claude Code:
+Vietnamese IMEs use a **delete + replace** protocol: send N delete characters (`\x7F`) then replacement chars via stdin. Claude Code (built on React/Ink) has 3 issues processing this protocol:
 
-1. **Stale closure**: `G6` (onInput) reads `y` state from a React closure — this state **never updates** between events within an IME burst
-2. **Split events**: Ink splits the burst into separate G6 calls — backspaces and replacement chars arrive in different calls
-3. **P6 uses stale state**: The text processor `P6(J6)(t)` captures state from React render, not from the `__imeState` bridge
+| Issue | Explanation |
+|---|---|
+| **Stale closure state** | `onInput` reads state from a React closure — this state doesn't update between events in a burst |
+| **Split events** | Ink splits the burst into separate calls — deletes and replacements arrive in different calls |
+| **P6 uses stale state** | The text processor `P6(J6)(t)` captures state from React render, not from the bridged state |
 
-### The Solution — Engine-Aware Patch v9
+### The Solution
 
-Based on thorough analysis of the [Gõ Nhanh engine documentation](docs/core-engine-algorithm.md), Claude Telex **directly patches** `cli.js` with 4 components:
+Claude Telex **directly patches** `cli.js`, injecting 4 handlers before the original logic to correctly process the IME protocol:
 
 ```mermaid
 flowchart LR
-    subgraph "Engine Protocol"
-        A["Gõ Nhanh: rats → rất"] --> B["Result{bs:2, chars:['ấ','t']}"]
-        B --> C["Stdin: ⌫⌫ + ất"]
+    subgraph "IME Protocol"
+        A["Type: banj → bạn"] --> B["Send: ⌫⌫ + ạn"]
     end
-    subgraph "v9 Patch — 4 Handlers"
-        D["1. stateSync"] --> E["Restore y from __imeState"]
-        F["2. rawHandler"] --> G["Process full chunk atomically"]
-        H["3. bsHandler"] --> I["Catch split backspaces"]
-        J["4. charHandler ★"] --> K["Catch split replacement chars"]
+    subgraph "Claude Telex — 4 Handlers"
+        C["stateSync"] --> D["Restore correct state"]
+        E["rawHandler"] --> F["Process full chunk"]
+        G["bsHandler"] --> H["Catch split backspaces"]
+        I["charHandler"] --> J["Catch replacement chars"]
     end
 ```
 
-**Key v9 patch details:**
-
-| Component | Description |
+| Handler | Purpose |
 |---|---|
-| `stateSync` | Restores `y` from `globalThis.__imeState`, clears when React catches up or on control keys |
-| `rawHandler` | When `\x7f` in input → processes entire chunk atomically |
-| `bsHandler` | When Ink splits `\x7f` into `backspace=true` → bridges state |
-| `charHandler` ★ | When `__imeState` active + normal char → `y.insert()` directly, bypassing `P6` (stale closure) |
-| Auto-upgrade | Auto-detects patches v1–v8 and upgrades |
+| **stateSync** | Restores state from `__imeState` bridge, auto-clears when React catches up or on control keys |
+| **rawHandler** | When the entire burst arrives in 1 chunk — processes atomically |
+| **bsHandler** | When Ink splits `\x7F` into separate backspace events — bridges state |
+| **charHandler** | When replacement chars arrive after backspaces — uses `insert()` directly, bypassing P6 (stale state) |
 
 ### Installation
 
@@ -301,7 +211,7 @@ go install github.com/nguyenhx2/claude-telex/cmd/claude-telex@latest
 Run `claude-telex` - the app will:
 
 1. 🔍 Auto-detect Claude Code's `cli.js`
-2. 🩹 Patch IME handling logic (v9 engine-aware)
+2. 🩹 Patch IME handling logic
 3. 🖥️ Show a system tray icon (orange = on, grey = off)
 4. ⚙️ Open Settings UI at `http://127.0.0.1:9315`
 
@@ -319,6 +229,7 @@ Run `claude-telex` - the app will:
 | **EVKey** | Windows | ✅ Fully supported |
 | **UniKey** | Windows | ✅ Fully supported |
 | **GoTiengViet** | Windows / macOS | ✅ Fully supported |
+| **[Gõ Nhanh](https://github.com/phucanh08/gonhanh)** | macOS | ✅ Fully supported |
 | **ibus-bamboo** | Linux | ✅ Fully supported |
 | Other IMEs (sending `\x7F`) | All | ✅ Works |
 
@@ -330,63 +241,6 @@ Run `claude-telex` - the app will:
 | 🪟 **Windows** | 10 / 11 (amd64, arm64) | ✅ Supported |
 | 🍎 **macOS** | 12 Monterey+ (Intel & Apple Silicon) | ✅ Supported |
 | 🐧 **Linux** | Ubuntu 20.04+, Fedora 36+, Arch (amd64, arm64) | ✅ Supported |
-
-### Architecture
-
-```mermaid
-graph TD
-    subgraph "⌨️ Claude Telex Binary"
-        M[main.go] --> T[tray<br/>System Tray Icon]
-        M --> S[settings<br/>HTTP Server :9315]
-        M --> HK[hotkey<br/>Ctrl+Alt+V]
-        
-        T --> P[patcher<br/>Find & Patch cli.js]
-        T --> IC[icon<br/>ICO/PNG Generator]
-        S --> P
-        S --> AS[autostart<br/>Registry/LaunchAgent/XDG]
-        S --> ST[state<br/>JSON Config]
-        S --> OI[osinfo<br/>Platform-specific]
-    end
-    
-    S --> |serves| UI[Settings UI<br/>index.html]
-    P --> |patches| CLI[Claude Code<br/>cli.js]
-    IC --> |renders| TRAY[System Tray<br/>🟠 On / ⚪ Off]
-    OI --> |Win: Registry<br/>Mac: sw_vers<br/>Lin: /etc/os-release| OS[OS Info]
-```
-
-#### Package Overview
-
-| Package | Description |
-|---|---|
-| `cmd/claude-telex` | Entry point, single-instance lock, orchestration |
-| `internal/patcher` | Find `cli.js`, extract dynamic vars via regex, inject fix v9 (engine-aware) |
-| `internal/tray` | System tray (ICO on Windows, PNG on macOS/Linux) |
-| `internal/settings` | HTTP server at port 9315, JSON API |
-| `internal/icon` | Programmatic icon rendering (circle + "VN" text) |
-| `internal/hotkey` | Global hotkey `Ctrl+Alt+V` |
-| `internal/autostart` | Auto-start: Windows Registry / macOS LaunchAgent / Linux XDG |
-| `internal/state` | JSON config at `~/.claude-telex/config.json` |
-| `assets/ui` | Embedded HTML Settings UI (dark theme, Inter font, copy CLI path) |
-
-### Patching Flow (v9)
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant CT as ⌨️ Claude Telex
-    participant JS as cli.js
-
-    U->>CT: Launch
-    CT->>JS: FindCliJS()
-    CT->>JS: ReadFile()
-    CT->>CT: Legacy patch (v1-v8)?<br/>→ Restore backup, then re-patch
-    CT->>CT: findBugBlock()<br/>Find .includes("\x7f")
-    CT->>CT: extractVariables()<br/>Regex: input, keyInfo, curState,<br/>updateText, updateOfs, cleanup1/2
-    CT->>CT: generateFix()<br/>stateSync + rawHandler +<br/>bsHandler + charHandler
-    CT->>JS: Inject fix BEFORE early-return guard
-    CT->>JS: WriteFile() + Verify marker
-    CT-->>U: ✅ Patched v9! System tray 🟠
-```
 
 ### Build & Run
 
@@ -406,42 +260,12 @@ cd Claude-Telex
 # Build binary
 go build -ldflags="-s -w -H windowsgui" -o claude-telex.exe ./cmd/claude-telex   # Windows
 go build -ldflags="-s -w" -o claude-telex ./cmd/claude-telex                      # macOS / Linux
-
-# Or use Make
-make build
-```
-
-#### Stop & Restart (Development — Windows)
-
-```powershell
-# Stop running instance
-Get-Process claude-telex -ErrorAction SilentlyContinue | Stop-Process -Force
-
-# Build and start
-go build -ldflags="-s -w -H windowsgui" -o claude-telex.exe ./cmd/claude-telex && `
-  Start-Process -FilePath ".\claude-telex.exe" -WindowStyle Hidden
-
-# Stop + Build + Restart in one command
-Get-Process claude-telex -ErrorAction SilentlyContinue | Stop-Process -Force; `
-  go build -ldflags="-s -w -H windowsgui" -o claude-telex.exe ./cmd/claude-telex && `
-  Start-Process -FilePath ".\claude-telex.exe" -WindowStyle Hidden
 ```
 
 #### Run (Development)
 
 ```bash
-# Run directly (with console output)
 go run ./cmd/claude-telex
-
-# Run the built binary
-./claude-telex        # macOS / Linux
-.\claude-telex.exe    # Windows
-```
-
-#### Release (snapshot)
-
-```bash
-goreleaser release --snapshot --clean
 ```
 
 ---

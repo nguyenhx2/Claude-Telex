@@ -22,6 +22,9 @@ import (
 const preferredPort = 9315
 const maxPortAttempts = 20
 
+// AppVersion is set by main at startup from ldflags.
+var AppVersion = "dev"
+
 // Server serves the web UI on a fixed (or nearby) localhost port.
 type Server struct {
 	Port int
@@ -121,23 +124,25 @@ func corsMiddleware(next http.Handler) http.Handler {
 // --- API handlers ---
 
 type statusResp struct {
-	Enabled   bool   `json:"enabled"`
-	Patched   bool   `json:"patched"`
-	Path      string `json:"path"`
-	Version   string `json:"version"`
-	Autostart bool   `json:"autostart"`
-	OS        string `json:"os"`
+	Enabled    bool   `json:"enabled"`
+	Patched    bool   `json:"patched"`
+	Path       string `json:"path"`
+	Version    string `json:"version"`
+	AppVersion string `json:"appVersion"`
+	Autostart  bool   `json:"autostart"`
+	OS         string `json:"os"`
 }
 
 func handleStatus(w http.ResponseWriter, _ *http.Request) {
 	st := state.Get()
 	resp := statusResp{
-		Enabled:   st.Enabled,
-		Patched:   st.PatchPath != "" && patcher.IsPatched(st.PatchPath),
-		Path:      st.PatchPath,
-		Version:   patcher.ClaudeVersion(st.PatchPath),
-		Autostart: autostart.IsEnabled(),
-		OS:        osInfo(),
+		Enabled:    st.Enabled,
+		Patched:    st.PatchPath != "" && patcher.IsPatched(st.PatchPath),
+		Path:       st.PatchPath,
+		Version:    patcher.ClaudeVersion(st.PatchPath),
+		AppVersion: AppVersion,
+		Autostart:  autostart.IsEnabled(),
+		OS:         osInfo(),
 	}
 	writeJSON(w, resp)
 }

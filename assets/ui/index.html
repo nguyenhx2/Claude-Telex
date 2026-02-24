@@ -533,7 +533,7 @@
       </svg>
       nguyenhx2/Claude-Telex
     </a>
-    <span class="footer-ver" id="foot-ver">v1.0.0</span>
+    <span class="footer-ver" id="foot-ver"></span>
   </div>
 
   <div id="toast"></div>
@@ -573,6 +573,7 @@
       }
       document.getElementById('version').textContent = s.version || '-';
       document.getElementById('os-info').textContent = s.os || '-';
+      document.getElementById('foot-ver').textContent = s.appVersion ? ('v' + s.appVersion) : '';
       const cliPath = s.path || '';
       document.getElementById('cli-path').textContent = cliPath || '(not found)';
       document.getElementById('copy-path-btn').style.display = cliPath ? '' : 'none';
