@@ -1,0 +1,50 @@
+{
+  "RT_GROUP_ICON": {
+    "APP": {
+      "0000": [
+        "../../../assets/icon/icon-256.png",
+        "../../../assets/icon/icon-48.png",
+        "../../../assets/icon/icon-32.png",
+        "../../../assets/icon/icon-16.png"
+      ]
+    }
+  },
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "identity": {
+          "name": "Claude Telex",
+          "version": "1.0.0.0"
+        },
+        "description": "Vietnamese TELEX Support for Claude Code CLI",
+        "minimum-os": "vista",
+        "execution-level": "asInvoker",
+        "dpi-awareness": "system",
+        "use-common-controls": true
+      }
+    }
+  },
+  "RT_VERSION": {
+    "#1": {
+      "0000": {
+        "fixed": {
+          "file_version": "1.0.1.0",
+          "product_version": "1.0.1.0"
+        },
+        "info": {
+          "0409": {
+            "Comments": "Vietnamese TELEX input fix for Claude Code CLI",
+            "CompanyName": "nguyenhx2",
+            "FileDescription": "Claude Telex",
+            "FileVersion": "1.0.1.0",
+            "InternalName": "claude-telex",
+            "LegalCopyright": "MIT License",
+            "OriginalFilename": "claude-telex.exe",
+            "ProductName": "Claude Telex",
+            "ProductVersion": "1.0.1.0"
+          }
+        }
+      }
+    }
+  }
+}

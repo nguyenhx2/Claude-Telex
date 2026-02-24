@@ -5,6 +5,7 @@
 *.dylib
 dist/
 *.bak
+*.syso
 test_*.ico
 
 *.code-workspace

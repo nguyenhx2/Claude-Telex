@@ -583,7 +583,7 @@
       }
       document.getElementById('version').textContent = s.version || '-';
       document.getElementById('os-info').textContent = s.os || '-';
-      document.getElementById('foot-ver').textContent = s.appVersion ? ('v' + s.appVersion) : '';
+      document.getElementById('foot-ver').textContent = s.appVersion || '';
       const cliPath = s.path || '';
       document.getElementById('cli-path').textContent = cliPath || '(not found)';
       document.getElementById('copy-path-btn').style.display = cliPath ? '' : 'none';

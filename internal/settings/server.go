@@ -15,6 +15,7 @@ import (
 
 	"github.com/nguyenhx2/claude-telex/assets/ui"
 	"github.com/nguyenhx2/claude-telex/internal/autostart"
+	"github.com/nguyenhx2/claude-telex/internal/icon"
 	"github.com/nguyenhx2/claude-telex/internal/patcher"
 	"github.com/nguyenhx2/claude-telex/internal/state"
 )
@@ -50,6 +51,7 @@ func Start() (*Server, error) {
 	mux.HandleFunc("/api/toggle", handleToggle)
 	mux.HandleFunc("/api/autostart", handleAutostart)
 	mux.HandleFunc("/api/patch", handlePatch)
+	mux.HandleFunc("/favicon.ico", handleFavicon)
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, map[string]bool{"ok": true})
 	})
@@ -204,6 +206,18 @@ func handlePatch(w http.ResponseWriter, _ *http.Request) {
 	}
 	state.Update(func(s *state.State) { s.LastPatchedVersion = patcher.ClaudeVersion(path) })
 	writeJSON(w, map[string]any{"ok": true})
+}
+
+var faviconOnce sync.Once
+var faviconData []byte
+
+func handleFavicon(w http.ResponseWriter, _ *http.Request) {
+	faviconOnce.Do(func() {
+		faviconData = icon.ICO(icon.StateOn)
+	})
+	w.Header().Set("Content-Type", "image/x-icon")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(faviconData)
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
