@@ -19,6 +19,10 @@ jobs:
             goos: darwin
           - os: windows-latest
             goos: windows
+            goarch: amd64
+          - os: windows-latest
+            goos: windows
+            goarch: 386
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +42,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            CGO_ENABLED=0 go build -ldflags="-s -w -H windowsgui -X main.version=${{ github.ref_name }}" -o claude-telex.exe ./cmd/claude-telex
+            GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -ldflags="-s -w -H windowsgui -X main.version=${{ github.ref_name }}" -o claude-telex.exe ./cmd/claude-telex
           elif [ "${{ matrix.goos }}" = "darwin" ]; then
             CGO_ENABLED=1 go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" -o claude-telex ./cmd/claude-telex
           else
@@ -48,7 +52,7 @@ jobs:
       - name: Package (Windows)
         if: matrix.goos == 'windows'
         shell: pwsh
-        run: Compress-Archive -Path claude-telex.exe,README.md,LICENSE -DestinationPath "claude-telex_${{ github.ref_name }}_windows_amd64.zip"
+        run: Compress-Archive -Path claude-telex.exe,README.md,LICENSE -DestinationPath "claude-telex_${{ github.ref_name }}_windows_${{ matrix.goarch }}.zip"
 
       - name: Package (Unix)
         if: matrix.goos != 'windows'
