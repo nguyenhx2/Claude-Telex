@@ -75,6 +75,10 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
@@ -82,16 +86,25 @@ jobs:
       - name: Create checksums
         run: sha256sum claude-telex_* > checksums.txt
 
+      - name: Extract changelog from tag
+        id: changelog
+        run: |
+          BODY=$(git tag -l --format='%(contents:body)' ${{ github.ref_name }})
+          echo "BODY<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             claude-telex_*
             checksums.txt
-          generate_release_notes: true
           body: |
             ## Claude TELEX ${{ github.ref_name }}
             Vietnamese TELEX Input Fix for Claude Code CLI.
+
+            ${{ steps.changelog.outputs.BODY }}
 
             ### Quick Install
             **Windows**: `irm https://raw.githubusercontent.com/nguyenhx2/Claude-Telex/main/install.ps1 | iex`

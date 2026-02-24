@@ -14,7 +14,8 @@ import (
 	"path/filepath"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -28,14 +29,11 @@ func main() {
 	os.MkdirAll(dir, 0o755)
 
 	sizes := []int{16, 32, 48, 64, 128, 256}
-
-	// Generate individual PNGs
 	for _, s := range sizes {
 		img := generateIcon(s)
 		savePNG(filepath.Join(dir, "icon-"+itoa(s)+".png"), img)
 	}
 
-	// Generate ICO with multiple sizes
 	ico := generateICO([]int{16, 32, 48, 256})
 	os.WriteFile(filepath.Join(dir, "app.ico"), ico, 0o644)
 
@@ -49,7 +47,6 @@ func generateIcon(size int) *image.RGBA {
 	cx, cy := float64(size)/2, float64(size)/2
 	r := float64(size)/2 - 1.5
 
-	// Anti-aliased circle
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
 			alpha := 0.0
@@ -79,14 +76,33 @@ func generateIcon(size int) *image.RGBA {
 }
 
 func drawText(img *image.RGBA, text string, size int, clr color.RGBA) {
-	face := basicfont.Face7x13
+	fontSize := float64(size) * 0.45
+	if fontSize < 10 {
+		fontSize = 10
+	}
+
+	f, err := opentype.Parse(goregular.TTF)
+	if err != nil {
+		return
+	}
+	face, err := opentype.NewFace(f, &opentype.FaceOptions{
+		Size:    fontSize,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		return
+	}
+	defer face.Close()
 
 	adv := fixed.Int26_6(0)
 	for _, r := range text {
-		a, _ := face.GlyphAdvance(r)
-		adv += a
+		a, ok := face.GlyphAdvance(r)
+		if ok {
+			adv += a
+		}
 	}
-	textW := int(adv >> 6)
+	textW := adv.Round()
 	ascent := face.Metrics().Ascent.Round()
 
 	x := (size - textW) / 2
@@ -117,10 +133,9 @@ func generateICO(sizes []int) []byte {
 	}
 
 	var buf bytes.Buffer
-	// ICONDIR
-	binary.Write(&buf, binary.LittleEndian, uint16(0))              // reserved
-	binary.Write(&buf, binary.LittleEndian, uint16(1))              // type=icon
-	binary.Write(&buf, binary.LittleEndian, uint16(len(entries)))   // count
+	binary.Write(&buf, binary.LittleEndian, uint16(0))
+	binary.Write(&buf, binary.LittleEndian, uint16(1))
+	binary.Write(&buf, binary.LittleEndian, uint16(len(entries)))
 
 	offset := uint32(6 + 16*len(entries))
 	for i, s := range sizes {
@@ -128,12 +143,12 @@ func generateICO(sizes []int) []byte {
 		if s >= 256 {
 			sz = 0
 		}
-		buf.WriteByte(sz)  // width
-		buf.WriteByte(sz)  // height
-		buf.WriteByte(0)   // color count
-		buf.WriteByte(0)   // reserved
-		binary.Write(&buf, binary.LittleEndian, uint16(1))          // planes
-		binary.Write(&buf, binary.LittleEndian, uint16(32))         // bit count
+		buf.WriteByte(sz)
+		buf.WriteByte(sz)
+		buf.WriteByte(0)
+		buf.WriteByte(0)
+		binary.Write(&buf, binary.LittleEndian, uint16(1))
+		binary.Write(&buf, binary.LittleEndian, uint16(32))
 		binary.Write(&buf, binary.LittleEndian, uint32(len(entries[i])))
 		binary.Write(&buf, binary.LittleEndian, offset)
 		offset += uint32(len(entries[i]))

@@ -12,7 +12,8 @@ import (
 	"math"
 
 	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/font/gofont/goregular"
+	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -90,15 +91,35 @@ func generateImage(state int, size int) *image.RGBA {
 }
 
 func drawTextCentered(img *image.RGBA, text string, size int, clr color.RGBA) {
-	face := basicfont.Face7x13
+	// Scale font size to ~45% of icon size, with minimum for small icons
+	fontSize := float64(size) * 0.45
+	if fontSize < 10 {
+		fontSize = 10
+	}
+
+	f, err := opentype.Parse(goregular.TTF)
+	if err != nil {
+		return
+	}
+	face, err := opentype.NewFace(f, &opentype.FaceOptions{
+		Size:    fontSize,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		return
+	}
+	defer face.Close()
 
 	// Measure advance
 	adv := fixed.Int26_6(0)
 	for _, r := range text {
-		a, _ := face.GlyphAdvance(r)
-		adv += a
+		a, ok := face.GlyphAdvance(r)
+		if ok {
+			adv += a
+		}
 	}
-	textW := int(adv >> 6)
+	textW := adv.Round()
 	ascent := face.Metrics().Ascent.Round()
 
 	x := (size - textW) / 2
