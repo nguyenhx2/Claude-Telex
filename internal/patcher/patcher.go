@@ -15,10 +15,19 @@ var ErrNotFound = errors.New("claude code cli.js not found; install with: npm in
 var ErrAlreadyPatched = errors.New("already patched")
 
 // patchMarker is embedded in patched files so we can detect them.
-const patchMarker = "/* Vietnamese IME fix v2 */"
+const patchMarker = "/* Vietnamese IME fix v9 */"
 
-// legacyMarkers lists markers from previous patch versions (for auto-upgrade).
-var legacyMarkers = []string{"/* Vietnamese IME fix */"}
+// We keep legacy markers so `Restore()` can strip older patches
+var legacyMarkers = []string{
+	"/* Vietnamese IME fix */",
+	"/* Vietnamese IME fix v2 */",
+	"/* Vietnamese IME fix v3 */",
+	"/* Vietnamese IME fix v4 */",
+	"/* Vietnamese IME fix v5 */",
+	"/* Vietnamese IME fix v6 */",
+	"/* Vietnamese IME fix v7 */",
+	"/* Vietnamese IME fix v8 */",
+}
 
 // delChar is the character Vietnamese IME sends as backspace (0x7F).
 const delChar = "\x7f"
@@ -44,14 +53,18 @@ func hasLegacyPatch(src string) bool {
 
 // Patch applies the Vietnamese IME fix to cli.js.
 //
-// Strategy:
-//  1. Find the onInput function (contains .includes("\x7f"))
-//  2. Find the early return guard: if(t===""&&o!=="")return;
-//  3. Replace the guard AND the original if-block with our fix FIRST,
-//     then the guard (so our \x7f check runs before the guard can eat it)
-//  4. Our fix processes each char sequentially:
-//     \x7f → .deleteTokenBefore()??.backspace(), else → .insert()
-//  5. After processing, call cleanup functions (XI6, MI6 etc.) from the original
+// Root cause: G6 (onInput handler) reads `y` (cursor state) from a React
+// closure captured at component render time. When Gõ Nhanh sends a burst
+// (N × \x7f + replacement chars), Ink splits them into individual key events.
+// React defers re-rendering, so `y` remains stale across all G6 calls
+// within one burst.
+//
+// Strategy (v9 — engine-aware):
+//  1. stateSync preamble: restore `y` from globalThis.__imeState, clear on
+//     control keys (detected as o==="" && !backspace)
+//  2. Raw \x7f handler: process the full IME burst atomically
+//  3. Backspace interception: handle Ink-split \x7f events with state bridge
+//  4. Normal path inherits correct `y` from stateSync — no regex injection
 func Patch(path string) error {
 	if IsPatched(path) {
 		return ErrAlreadyPatched
@@ -83,13 +96,13 @@ func Patch(path string) error {
 		return fmt.Errorf("write backup: %w", err)
 	}
 
-	// Step 1: Find the bug block to extract variable names
+	// Step 1: Find the bug block to extract variable names and key-info var
 	blockStart, blockEnd, block, err := findBugBlock(src)
 	if err != nil {
 		return err
 	}
 
-	// Step 2: Extract dynamic variable names
+	// Step 2: Extract dynamic variable names (including key-info var)
 	vars, err := extractVariables(block)
 	if err != nil {
 		return fmt.Errorf("extract variables: %w", err)
@@ -105,21 +118,23 @@ func Patch(path string) error {
 	fixCode := generateFix(vars)
 
 	var patched string
-	if guardIdx != -1 {
-		// We found the guard — inject our fix BEFORE the guard, then remove the old bug block
-		guardAbsIdx := (blockStart - 200) + guardIdx
-
-		// Our fix replaces from guardAbsIdx through blockEnd
-		// Layout: [fix_code][guard_code][remaining_after_bugblock]
-		patched = src[:guardAbsIdx] + fixCode + guardPattern + src[blockEnd:]
+	if guardIdx > -1 {
+		// Guard found: Inject before the guard
+		before := src[:blockStart-200+guardIdx]
+		// Skip the guard and the original bug block
+		after := src[blockEnd:]
+		patched = before + fixCode + guardSearch[guardIdx:] + after
 	} else {
-		// No guard found — just replace the bug block (original approach)
+		// Guard not found: Just replace the bug block
 		patched = src[:blockStart] + fixCode + src[blockEnd:]
 	}
 
+	// Step 5: (Removed in v9 — stateSync preamble handles recovery)
+	// Step 6: (Removed in v9 — no more fragile regex injection into Claude's code)
+
+	// Write patched file to disk
 	if err := os.WriteFile(path, []byte(patched), 0o644); err != nil {
-		_ = os.WriteFile(path, data, 0o644)
-		return fmt.Errorf("write patched file: %w", err)
+		return fmt.Errorf("write patched cli.js: %w", err)
 	}
 
 	// Verify
@@ -206,14 +221,13 @@ found:
 // variables holds the dynamic variable names extracted from the bug block.
 type variables struct {
 	input      string // the raw input data variable (e.g. "o")
-	keyInfo    string // the key info parameter (e.g. "J6") — has .backspace, .delete props
+	keyInfo    string // the key info parameter (e.g. "J6") with backspace/ctrl/meta
 	state      string // the mutable state variable (e.g. "H6")
 	curState   string // the current (snapshot) state variable (e.g. "y")
 	updateText string // function that updates text (e.g. "q")
 	updateOfs  string // function that updates cursor offset (e.g. "v")
 	cleanup1   string // first cleanup function (e.g. "XI6")
 	cleanup2   string // second cleanup function (e.g. "MI6")
-	hasDTB     bool   // whether .deleteTokenBefore() is used in the original
 }
 
 // extractVariables extracts dynamic variable names from the minified bug block.
@@ -253,16 +267,14 @@ func extractVariables(block string) (*variables, error) {
 		return nil, errors.New("cannot extract input variable from bug block")
 	}
 
-	// Extract key info parameter from the guard: !J6.backspace&&!J6.delete
-	keyInfo := ""
-	reKeyInfo := regexp.MustCompile(`!([\w$]+)\.backspace&&!([\w$]+)\.delete`)
+	// NOTE: v7 now DOES extract the key info parameter (e.g. J6) because
+	// the backspace interception handler needs to check J6.backspace, J6.ctrl, J6.meta.
+	reKeyInfo := regexp.MustCompile(`if\(!([\w$]+)\.backspace`)
 	m4 := reKeyInfo.FindStringSubmatch(block)
-	if m4 != nil && m4[1] == m4[2] {
+	keyInfo := ""
+	if m4 != nil {
 		keyInfo = m4[1]
 	}
-
-	// Check if deleteTokenBefore is used
-	hasDTB := strings.Contains(block, ".deleteTokenBefore()")
 
 	// Extract cleanup functions: XI6(),MI6()
 	// They appear after the update block, before return
@@ -284,24 +296,23 @@ func extractVariables(block string) (*variables, error) {
 		updateOfs:  m2[2],
 		cleanup1:   cleanup1,
 		cleanup2:   cleanup2,
-		hasDTB:     hasDTB,
 	}, nil
 }
 
 // generateFix produces the replacement JavaScript code.
 //
-// It processes each character sequentially:
-//   - \x7f → .deleteTokenBefore()??.backspace() (matches original Claude Code behavior)
-//   - else → .insert(c) (THIS is the fix — original code drops replacement chars)
+// It contains TWO sequential handlers:
+//  1. Raw \x7f path: for when IME data arrives as a single chunk containing \x7f.
+//     Processes each character sequentially: \x7f → .backspace(), else → .insert(c).
+//  2. Backspace interception: for when Ink parses \x7f as backspace
+//     and sets backspace=true, input="". We handle backspace ourselves with state
+//     bridge to maintain coherence across the IME burst.
 //
 // IMPORTANT: We use `let _s` (locally scoped) to avoid corrupting any outer-scope
 // variable with the same minified name.
 func generateFix(v *variables) string {
-	// Build the backspace expression
 	bsExpr := "_s=_s.backspace();"
-	if v.hasDTB {
-		bsExpr = "_s=_s.deleteTokenBefore()??_s.backspace();"
-	}
+	bridge := "globalThis.__imeState=_s;"
 
 	// Build the cleanup calls
 	cleanup := ""
@@ -309,27 +320,32 @@ func generateFix(v *variables) string {
 		cleanup = v.cleanup1 + "()," + v.cleanup2 + "();"
 	}
 
-	// Build the key-info guard
-	guard := ""
-	if v.keyInfo != "" {
-		guard = "!" + v.keyInfo + ".backspace&&!" + v.keyInfo + ".delete&&"
-	}
+	// stateSync preamble: restore or clear globalThis.__imeState.
+	// Control keys always have o==="" and backspace===false in Ink,
+	// so we detect them generically without listing individual keys.
+	stateSync := fmt.Sprintf(
+		`if(globalThis.__imeState){`+
+			`if(%s.text===globalThis.__imeState.text)globalThis.__imeState=null;`+
+			`else if(%s.length===0&&!%s.backspace)globalThis.__imeState=null;`+
+			`else %s=globalThis.__imeState;`+
+			`}`,
+		v.curState, v.input, v.keyInfo, v.curState,
+	)
 
-	return fmt.Sprintf(
-		`%s`+
-			`if(%s%s.includes("\x7f")){`+
+	// Part 1: Raw \x7f handler (when IME data arrives as one chunk)
+	rawHandler := fmt.Sprintf(
+		`if(%s.includes("\x7f")){`+
 			`let _s=%s;`+
 			`for(const _c of %s){`+
 			`if(_c==="\x7f"){%s}`+
 			`else{_s=_s.insert(_c);}`+
 			`}`+
 			`if(!%s.equals(_s)){`+
-			`if(%s.text!==_s.text)`+
-			`%s(_s.text);`+
-			`%s(_s.offset)`+
+			`if(%s.text!==_s.text)%s(_s.text);`+
+			`%s(_s.offset);`+
+			`%s=_s;`+
+			`%s`+ // Bridge
 			`}%sreturn;}`,
-		patchMarker,
-		guard,
 		v.input,
 		v.curState,
 		v.input,
@@ -338,8 +354,71 @@ func generateFix(v *variables) string {
 		v.curState,
 		v.updateText,
 		v.updateOfs,
+		v.curState,
+		bridge,
 		cleanup,
 	)
+
+	// Part 2: Backspace interception (when Ink parses \x7f as backspace)
+	// Ink sets J6.backspace=true and input="" for \x7f bytes.
+	// We handle this BEFORE the normal path to maintain state coherence.
+	// If keyInfo was not extracted, skip — fall back to v6 behavior.
+	bsHandler := ""
+	if v.keyInfo != "" {
+		bsHandler = fmt.Sprintf(
+			`if(%s.backspace&&!%s.ctrl&&!%s.meta){`+
+				`let _s=%s.backspace();`+
+				`if(!%s.equals(_s)){`+
+				`if(%s.text!==_s.text)`+
+				`%s(_s.text);`+
+				`%s(_s.offset);`+
+				`%s=_s;`+
+				`%s`+ // Bridge
+				`}%sreturn;}`,
+			v.keyInfo, v.keyInfo, v.keyInfo,
+			v.curState,
+			v.curState,
+			v.curState,
+			v.updateText,
+			v.updateOfs,
+			v.curState,
+			bridge,
+			cleanup,
+		)
+	}
+
+	// Part 3: Char insertion during IME burst (when Ink splits replacement chars)
+	//
+	// When __imeState is active, replacement characters (e.g. "ất" from "rất")
+	// must NOT fall through to P6(J6)(t) — P6 captures state from the React
+	// closure, which is STALE during the burst. Instead, we insert directly
+	// using y.insert() with the correct bridged state from __imeState.
+	charHandler := ""
+	if v.keyInfo != "" {
+		charHandler = fmt.Sprintf(
+			`if(globalThis.__imeState&&%s.length>0&&!%s.backspace){`+
+				`let _s=%s;`+
+				`for(const _c of %s){_s=_s.insert(_c);}`+
+				`if(!%s.equals(_s)){`+
+				`if(%s.text!==_s.text)%s(_s.text);`+
+				`%s(_s.offset);`+
+				`%s=_s;`+
+				`%s`+ // Bridge
+				`}%sreturn;}`,
+			v.input, v.keyInfo,
+			v.curState,
+			v.input,
+			v.curState,
+			v.curState,
+			v.updateText,
+			v.updateOfs,
+			v.curState,
+			bridge,
+			cleanup,
+		)
+	}
+
+	return patchMarker + stateSync + rawHandler + bsHandler + charHandler
 }
 
 // stripPatch removes the injected block from src when no backup is available.

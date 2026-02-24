@@ -135,7 +135,10 @@ func TestPatch_Basic(t *testing.T) {
 	}
 }
 
-func TestPatch_UsesDeleteTokenBefore(t *testing.T) {
+// TestPatch_UsesBackspaceOnly verifies the fix uses .backspace() per \x7f,
+// NOT deleteTokenBefore() which deletes whole words (like Ctrl+W) and overshoots
+// when Vietnamese IME sends multiple \x7f chars for tone mark corrections.
+func TestPatch_UsesBackspaceOnly(t *testing.T) {
 	dir := t.TempDir()
 	path := simulateCliJS(t, dir)
 
@@ -146,9 +149,13 @@ func TestPatch_UsesDeleteTokenBefore(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	src := string(data)
 
-	// Must use deleteTokenBefore()??backspace() not just backspace()
-	if !strings.Contains(src, ".deleteTokenBefore()??_s.backspace()") {
-		t.Error("fix must use deleteTokenBefore for proper token deletion")
+	// Must use plain backspace() — one char per \x7f
+	if !strings.Contains(src, "_s=_s.backspace();") {
+		t.Error("fix must use _s.backspace() for each \\x7f")
+	}
+	// Must NOT use deleteTokenBefore (word-level delete, overshoots for Vietnamese)
+	if strings.Contains(src, "deleteTokenBefore") {
+		t.Error("fix must NOT use deleteTokenBefore (deletes whole words, breaks Vietnamese tone marks)")
 	}
 }
 
@@ -169,7 +176,10 @@ func TestPatch_CallsCleanupFunctions(t *testing.T) {
 	}
 }
 
-func TestPatch_PreservesKeyInfoGuard(t *testing.T) {
+// TestPatch_NoKeyInfoGuard verifies the fix does NOT include the J6.backspace guard.
+// Ink's key parser sets backspace=true for standalone \x7f bytes, which blocks the fix
+// when Node.js splits the IME's multi-char input into separate events.
+func TestPatch_NoKeyInfoGuard(t *testing.T) {
 	dir := t.TempDir()
 	path := simulateCliJS(t, dir)
 
@@ -180,9 +190,13 @@ func TestPatch_PreservesKeyInfoGuard(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	src := string(data)
 
-	// Must preserve the !J6.backspace&&!J6.delete guard
-	if !strings.Contains(src, "!J6.backspace&&!J6.delete&&") {
-		t.Error("fix must preserve key-info guard for real backspace/delete keys")
+	// Must NOT have the key-info guard — it blocks the fix for IME events
+	if strings.Contains(src, "!J6.backspace&&!J6.delete&&") {
+		t.Error("fix must NOT include key-info guard (blocks IME backspace events)")
+	}
+	// Must still include the \x7f check as the only guard
+	if !strings.Contains(src, `o.includes("`) {
+		t.Error("fix must check o.includes as its only guard")
 	}
 }
 
@@ -228,8 +242,8 @@ func TestPatch_AlternateVariableNames(t *testing.T) {
 	if !strings.Contains(src, "let _s=snap") {
 		t.Error("fix should declare local _s from curState 'snap'")
 	}
-	if !strings.Contains(src, "_s=_s.deleteTokenBefore()??_s.backspace()") {
-		t.Error("fix should use deleteTokenBefore")
+	if !strings.Contains(src, "_s=_s.backspace();") {
+		t.Error("fix should use backspace() for each \\x7f")
 	}
 	if !strings.Contains(src, "fn1(_s.text)") {
 		t.Error("fix should use updateText func 'fn1'")
@@ -240,8 +254,9 @@ func TestPatch_AlternateVariableNames(t *testing.T) {
 	if !strings.Contains(src, "CL1(),CL2()") {
 		t.Error("fix should use cleanup funcs 'CL1','CL2'")
 	}
-	if !strings.Contains(src, "!QR7.backspace&&!QR7.delete&&") {
-		t.Error("fix should use key-info guard with 'QR7'")
+	// v7+: backspace interception SHOULD use key-info (QR7) for backspace handler
+	if !strings.Contains(src, "QR7.backspace&&!QR7.ctrl&&!QR7.meta") {
+		t.Error("fix must include backspace interception using extracted keyInfo")
 	}
 }
 
@@ -280,9 +295,12 @@ func TestPatch_LegacyAutoUpgrade(t *testing.T) {
 	if strings.Contains(src, "/* Vietnamese IME fix */if") {
 		t.Error("old patch marker still present after upgrade")
 	}
-	// Should have the new fix features
-	if !strings.Contains(src, "deleteTokenBefore") {
-		t.Error("upgraded patch should use deleteTokenBefore")
+	// Should use backspace() not deleteTokenBefore
+	if !strings.Contains(src, "_s=_s.backspace();") {
+		t.Error("upgraded patch should use backspace()")
+	}
+	if strings.Contains(src, "deleteTokenBefore") {
+		t.Error("upgraded patch must not use deleteTokenBefore")
 	}
 }
 
@@ -414,6 +432,7 @@ func TestExtractVariables_StandardBlock(t *testing.T) {
 	if vars.keyInfo != "J6" {
 		t.Errorf("expected keyInfo='J6', got '%s'", vars.keyInfo)
 	}
+	// keyInfo is extracted (v7: backspace interception uses it)
 	if vars.state != "e3" {
 		t.Errorf("expected state='e3', got '%s'", vars.state)
 	}
@@ -432,9 +451,6 @@ func TestExtractVariables_StandardBlock(t *testing.T) {
 	if vars.cleanup2 != "MI6" {
 		t.Errorf("expected cleanup2='MI6', got '%s'", vars.cleanup2)
 	}
-	if !vars.hasDTB {
-		t.Error("expected hasDTB=true")
-	}
 }
 
 func TestExtractVariables_DifferentNames(t *testing.T) {
@@ -451,6 +467,7 @@ func TestExtractVariables_DifferentNames(t *testing.T) {
 	if vars.keyInfo != "QR7" {
 		t.Errorf("expected keyInfo='QR7', got '%s'", vars.keyInfo)
 	}
+	// keyInfo is extracted (v7: backspace interception uses it)
 	if vars.state != "xyz" {
 		t.Errorf("expected state='xyz', got '%s'", vars.state)
 	}
@@ -471,7 +488,7 @@ func TestGenerateFix_ContainsMarker(t *testing.T) {
 	v := &variables{
 		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "XI6", cleanup2: "MI6", hasDTB: true,
+		cleanup1: "XI6", cleanup2: "MI6",
 	}
 	fix := generateFix(v)
 
@@ -484,7 +501,7 @@ func TestGenerateFix_SequentialProcessing(t *testing.T) {
 	v := &variables{
 		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "XI6", cleanup2: "MI6", hasDTB: true,
+		cleanup1: "XI6", cleanup2: "MI6",
 	}
 	fix := generateFix(v)
 
@@ -496,8 +513,12 @@ func TestGenerateFix_SequentialProcessing(t *testing.T) {
 		t.Error("fix must check each char for \\x7f")
 	}
 
-	if !strings.Contains(fix, "_s=_s.deleteTokenBefore()??_s.backspace()") {
-		t.Error("fix must use deleteTokenBefore for backspace handling")
+	// Must use plain backspace — one char per \x7f (NOT deleteTokenBefore which deletes whole words)
+	if !strings.Contains(fix, "_s=_s.backspace();") {
+		t.Error("fix must use _s.backspace() per \\x7f")
+	}
+	if strings.Contains(fix, "deleteTokenBefore") {
+		t.Error("fix must NOT use deleteTokenBefore")
 	}
 
 	if !strings.Contains(fix, "_s=_s.insert(_c)") {
@@ -509,7 +530,7 @@ func TestGenerateFix_UpdatesTextAndOffset(t *testing.T) {
 	v := &variables{
 		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "XI6", cleanup2: "MI6", hasDTB: true,
+		cleanup1: "XI6", cleanup2: "MI6",
 	}
 	fix := generateFix(v)
 
@@ -519,13 +540,16 @@ func TestGenerateFix_UpdatesTextAndOffset(t *testing.T) {
 	if !strings.Contains(fix, "S5(_s.offset)") {
 		t.Error("fix must call updateOfs with _s.offset")
 	}
+	if !strings.Contains(fix, "y=_s;") {
+		t.Error("fix must mutate curState to _s")
+	}
 }
 
 func TestGenerateFix_ComparesWithSnapshot(t *testing.T) {
 	v := &variables{
 		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "XI6", cleanup2: "MI6", hasDTB: true,
+		cleanup1: "XI6", cleanup2: "MI6",
 	}
 	fix := generateFix(v)
 
@@ -538,7 +562,7 @@ func TestGenerateFix_EndsWithReturn(t *testing.T) {
 	v := &variables{
 		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "XI6", cleanup2: "MI6", hasDTB: true,
+		cleanup1: "XI6", cleanup2: "MI6",
 	}
 	fix := generateFix(v)
 
@@ -551,7 +575,7 @@ func TestGenerateFix_IncludesCleanup(t *testing.T) {
 	v := &variables{
 		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "XI6", cleanup2: "MI6", hasDTB: true,
+		cleanup1: "XI6", cleanup2: "MI6",
 	}
 	fix := generateFix(v)
 
@@ -560,33 +584,45 @@ func TestGenerateFix_IncludesCleanup(t *testing.T) {
 	}
 }
 
-func TestGenerateFix_IncludesKeyInfoGuard(t *testing.T) {
+// TestGenerateFix_NoOriginalGuard verifies the fix does NOT include the ORIGINAL key-info guard pattern.
+// The original pattern is `!J6.backspace&&!J6.delete&&` which BLOCKS the fix for IME events.
+// v7 uses a DIFFERENT pattern: `J6.backspace&&!J6.ctrl&&!J6.meta` (positive, not negative).
+func TestGenerateFix_NoOriginalGuard(t *testing.T) {
 	v := &variables{
 		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "XI6", cleanup2: "MI6", hasDTB: true,
+		cleanup1: "XI6", cleanup2: "MI6",
 	}
 	fix := generateFix(v)
 
-	if !strings.Contains(fix, "!J6.backspace&&!J6.delete&&o.includes") {
-		t.Error("fix must include key-info guard")
+	// Must NOT have the ORIGINAL key-info guard (it blocks IME backspace events)
+	if strings.Contains(fix, "!J6.backspace&&!J6.delete&&") {
+		t.Error("fix must NOT include original key-info guard pattern")
+	}
+	// Must have the includes check for raw \x7f
+	if !strings.Contains(fix, `o.includes("\x7f")`) {
+		t.Error("fix must gate on o.includes for raw \\x7f")
+	}
+	// v7: Must have the POSITIVE backspace check for interception
+	if !strings.Contains(fix, "J6.backspace&&!J6.ctrl&&!J6.meta") {
+		t.Error("fix must include v7 backspace interception")
 	}
 }
 
-func TestGenerateFix_NoDeleteTokenBefore(t *testing.T) {
+// TestGenerateFix_AlwaysBackspaceOnly verifies we NEVER use deleteTokenBefore.
+func TestGenerateFix_AlwaysBackspaceOnly(t *testing.T) {
 	v := &variables{
-		input: "o", keyInfo: "", state: "e3", curState: "y",
+		input: "o", keyInfo: "J6", state: "e3", curState: "y",
 		updateText: "h7", updateOfs: "S5",
-		cleanup1: "", cleanup2: "", hasDTB: false,
+		cleanup1: "", cleanup2: "",
 	}
 	fix := generateFix(v)
 
-	// Without DTB, should use plain backspace
 	if !strings.Contains(fix, "_s=_s.backspace();") {
-		t.Error("fix without DTB should use plain backspace")
+		t.Error("fix must use plain backspace()")
 	}
 	if strings.Contains(fix, "deleteTokenBefore") {
-		t.Error("fix without DTB should NOT use deleteTokenBefore")
+		t.Error("fix must NEVER use deleteTokenBefore")
 	}
 }
 
@@ -675,5 +711,173 @@ func TestPatch_FixNotCorruptSurroundings(t *testing.T) {
 	}
 	if !strings.Contains(src, "function onInput(") {
 		t.Error("function declaration corrupted")
+	}
+}
+
+func TestGenerateFix_StateSyncClearsOnControlKey(t *testing.T) {
+	v := &variables{
+		input: "o", keyInfo: "J6", state: "e3", curState: "y",
+		updateText: "h7", updateOfs: "S5",
+		cleanup1: "XI6", cleanup2: "MI6",
+	}
+	fix := generateFix(v)
+
+	// Must detect control keys as o.length===0 && !J6.backspace
+	if !strings.Contains(fix, "o.length===0&&!J6.backspace") {
+		t.Error("fix must detect control keys via o.length===0 && !J6.backspace")
+	}
+	// Must clear __imeState on control key
+	if !strings.Contains(fix, "globalThis.__imeState=null") {
+		t.Error("fix must clear __imeState on control key")
+	}
+}
+
+func TestGenerateFix_StateSyncRestoresState(t *testing.T) {
+	v := &variables{
+		input: "o", keyInfo: "J6", state: "e3", curState: "y",
+		updateText: "h7", updateOfs: "S5",
+		cleanup1: "XI6", cleanup2: "MI6",
+	}
+	fix := generateFix(v)
+
+	// Must restore y from __imeState
+	if !strings.Contains(fix, "y=globalThis.__imeState") {
+		t.Error("fix must restore curState from __imeState")
+	}
+	// Must check text equality for auto-clear
+	if !strings.Contains(fix, "y.text===globalThis.__imeState.text") {
+		t.Error("fix must auto-clear when React catches up")
+	}
+}
+
+func TestGenerateFix_IncludesImeStateBridge(t *testing.T) {
+	v := &variables{
+		input: "o", keyInfo: "J6", state: "e3", curState: "y",
+		updateText: "h7", updateOfs: "S5",
+		cleanup1: "XI6", cleanup2: "MI6",
+	}
+	fix := generateFix(v)
+
+	if !strings.Contains(fix, "globalThis.__imeState=_s;") {
+		t.Error("fix must set globalThis.__imeState")
+	}
+	if strings.Contains(fix, "setTimeout") {
+		t.Error("fix must NOT include setTimeout")
+	}
+}
+
+// --- v7 Backspace Interception Tests ---
+
+func TestGenerateFix_BackspaceInterception(t *testing.T) {
+	v := &variables{
+		input: "o", keyInfo: "J6", state: "e3", curState: "y",
+		updateText: "h7", updateOfs: "S5",
+		cleanup1: "XI6", cleanup2: "MI6",
+	}
+	fix := generateFix(v)
+
+	// Must contain backspace interception block
+	if !strings.Contains(fix, "J6.backspace&&!J6.ctrl&&!J6.meta") {
+		t.Error("fix must contain backspace interception with ctrl/meta guard")
+	}
+	// Must call y.backspace() in the handler
+	if !strings.Contains(fix, "let _s=y.backspace();") {
+		t.Error("fix must call curState.backspace() in backspace handler")
+	}
+	// Must save state to globalThis.__imeState in ALL THREE handlers
+	if c := strings.Count(fix, "globalThis.__imeState=_s;"); c < 3 {
+		t.Errorf("fix must set __imeState in raw, backspace, AND char handlers, got %d occurrences", c)
+	}
+	// Must call cleanup in ALL THREE handlers
+	if c := strings.Count(fix, "XI6(),MI6();"); c < 3 {
+		t.Errorf("fix must call cleanup in all 3 handlers, got %d occurrences", c)
+	}
+}
+
+func TestGenerateFix_BackspaceInterceptionReturns(t *testing.T) {
+	v := &variables{
+		input: "o", keyInfo: "J6", state: "e3", curState: "y",
+		updateText: "h7", updateOfs: "S5",
+		cleanup1: "XI6", cleanup2: "MI6",
+	}
+	fix := generateFix(v)
+
+	// The backspace handler must return; to prevent fallthrough to normal path
+	// Count returns — should have 3: raw, backspace, and char handlers
+	if c := strings.Count(fix, "return;}"); c < 3 {
+		t.Errorf("fix must have return;} in all 3 handlers, got %d", c)
+	}
+}
+
+func TestGenerateFix_NoBackspaceWithoutKeyInfo(t *testing.T) {
+	v := &variables{
+		input: "o", keyInfo: "", state: "e3", curState: "y",
+		updateText: "h7", updateOfs: "S5",
+		cleanup1: "XI6", cleanup2: "MI6",
+	}
+	fix := generateFix(v)
+
+	// Without keyInfo, backspace handler should not be generated
+	if strings.Contains(fix, ".backspace&&") {
+		t.Error("fix must NOT include backspace handler when keyInfo is empty")
+	}
+	// Raw \x7f handler should still be present
+	if !strings.Contains(fix, `o.includes("\x7f")`) {
+		t.Error("raw \\x7f handler must still be present")
+	}
+}
+
+func TestPatch_BackspaceInterceptionInPatched(t *testing.T) {
+	dir := t.TempDir()
+	path := simulateCliJS(t, dir)
+
+	if err := Patch(path); err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := os.ReadFile(path)
+	src := string(data)
+
+	// Verify backspace interception is in the patched file
+	if !strings.Contains(src, "J6.backspace&&!J6.ctrl&&!J6.meta") {
+		t.Error("patched file must contain backspace interception")
+	}
+	if !strings.Contains(src, "let _s=y.backspace();") {
+		t.Error("patched file must contain y.backspace() call")
+	}
+}
+
+func TestGenerateFix_AlternateVarsBackspace(t *testing.T) {
+	v := &variables{
+		input: "abc", keyInfo: "QR7", state: "xyz", curState: "snap",
+		updateText: "fn1", updateOfs: "fn2",
+		cleanup1: "CL1", cleanup2: "CL2",
+	}
+	fix := generateFix(v)
+
+	// Check that alternate key-info var is used correctly
+	if !strings.Contains(fix, "QR7.backspace&&!QR7.ctrl&&!QR7.meta") {
+		t.Error("backspace handler must use alternate keyInfo var")
+	}
+	if !strings.Contains(fix, "let _s=snap.backspace();") {
+		t.Error("backspace handler must use alternate curState var")
+	}
+}
+
+func TestGenerateFix_CharHandlerDuringBurst(t *testing.T) {
+	v := &variables{
+		input: "o", keyInfo: "J6", state: "e3", curState: "y",
+		updateText: "h7", updateOfs: "S5",
+		cleanup1: "XI6", cleanup2: "MI6",
+	}
+	fix := generateFix(v)
+
+	// Must intercept chars when __imeState is active
+	if !strings.Contains(fix, "globalThis.__imeState&&o.length>0&&!J6.backspace") {
+		t.Error("fix must intercept replacement chars during IME burst")
+	}
+	// Must use insert() for each char
+	if !strings.Contains(fix, "_s=_s.insert(_c)") {
+		t.Error("char handler must use insert() for replacement chars")
 	}
 }

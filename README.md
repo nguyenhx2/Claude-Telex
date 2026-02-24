@@ -20,49 +20,45 @@
 
 ### Vấn đề
 
-Khi gõ tiếng Việt bằng bộ gõ TELEX (EVKey, UniKey, GoTiengViet...) trong Claude Code CLI, ký tự bị **mất** hoặc **hiển thị sai** vì Claude Code xử lý ký tự xoá (backspace `\x7F`) theo nhóm thay vì từng ký tự.
+Khi gõ tiếng Việt bằng bộ gõ TELEX (EVKey, UniKey, GoTiengViet, [Gõ Nhanh](https://github.com/phucanh08/gonhanh)...) trong Claude Code CLI, ký tự bị **mất** hoặc **hiển thị sai**.
 
 > **Ví dụ:** Gõ `banj` mong đợi `bạn`, nhưng nhận được `bn` hoặc text bị lỗi.
 
 ### Nguyên nhân gốc
 
-Phân tích source code thực của Claude Code (`cli.js`) cho thấy hàm `onInput` xử lý TELEX theo logic sau:
+Bộ gõ tiếng Việt hoạt động theo giao thức **backspace + thay thế**: gửi N × `\x7F` (xóa) rồi gửi ký tự thay thế. Hai vấn đề trong Claude Code:
 
-1. **Đếm** tổng số ký tự `\x7F` (backspace)
-2. **Xoá** N lần bằng `deleteTokenBefore()??backspace()`  
-3. **Không chèn** các ký tự thay thế (bug gốc của Anthropic — bị drop hoàn toàn!)
+1. **Stale closure**: Hàm `G6` (onInput) đọc state `y` từ React closure — state này **không cập nhật** giữa các event trong một burst IME
+2. **Split events**: Ink tách burst thành nhiều G6 call riêng biệt — backspace và ký tự thay thế đến ở các call khác nhau
+3. **P6 dùng state cũ**: Hàm xử lý ký tự `P6(J6)(t)` capture state từ React render, không từ `__imeState` bridge
 
-Kết quả: chữ bị xoá nhưng ký tự tiếng Việt đúng không bao giờ được ghi vào.
+### Giải pháp — Engine-Aware Patch v9
 
-### Giải pháp — Thuật toán Patch v2
-
-Claude Telex **patch trực tiếp** vào `cli.js`, thay thế logic lỗi bằng vòng lặp **xử lý tuần tự từng ký tự**:
+Dựa trên phân tích kĩ [tài liệu kiến trúc của Gõ Nhanh](docs/core-engine-algorithm.md), Claude Telex **patch trực tiếp** vào `cli.js` với 4 thành phần:
 
 ```mermaid
 flowchart LR
-    subgraph "❌ Gốc - Lỗi (Anthropic)"
-        A["EVKey gửi: ⌫⌫ + ạn"] --> B["Đếm 2 backspace"]
-        B --> C["deleteTokenBefore() × 2"]
-        C --> D["❌ Drop ký tự 'ạn' — không insert!"]
+    subgraph "Engine Protocol"
+        A["Gõ Nhanh: rats → rất"] --> B["Result{bs:2, chars:['ấ','t']}"]
+        B --> C["Stdin: ⌫⌫ + ất"]
     end
-    subgraph "✅ Claude Telex v2 - Fix"
-        E["EVKey gửi: ⌫⌫ + ạn"] --> F["for..of từng ký tự"]
-        F --> G["⌫ → deleteTokenBefore() ?? backspace()"]
-        F --> H["ạ → .insert('ạ')"]
-        F --> I["n → .insert('n')"]
-        G & H & I --> J["✅ Hiển thị đúng 'bạn'"]
+    subgraph "v9 Patch — 4 Handlers"
+        D["1. stateSync"] --> E["Khôi phục y từ __imeState"]
+        F["2. rawHandler"] --> G["Xử lý chunk nguyên: ⌫+chars"]
+        H["3. bsHandler"] --> I["Bắt backspace tách lẻ"]
+        J["4. charHandler ★"] --> K["Bắt ký tự thay thế tách lẻ"]
     end
 ```
 
-**Các chi tiết quan trọng của patch v2:**
+**Các chi tiết quan trọng:**
 
 | Thành phần | Mô tả |
 |---|---|
-| `deleteTokenBefore()??backspace()` | Xoá đúng cấp độ token (ký tự tổ hợp Unicode) thay vì byte đơn lẻ |
-| `!J6.backspace&&!J6.delete` guard | Không can thiệp khi người dùng nhấn phím Backspace/Delete thật |
-| Cleanup functions (`XI6(),MI6()`) | Gọi đúng các hàm cleanup nội bộ của Claude Code sau mỗi lần xử lý |
-| `let _s = curState` | Biến local có scope an toàn — không ô nhiễm biến minified bên ngoài |
-| Auto-upgrade v1→v2 | Tự phát hiện và nâng cấp patch cũ khi restart |
+| `stateSync` | Khôi phục `y` từ `globalThis.__imeState`, clear khi React catch up hoặc control key |
+| `rawHandler` | Khi `\x7f` trong input → xử lý toàn bộ chunk atomically |
+| `bsHandler` | Khi Ink tách `\x7f` thành `backspace=true` → bridge state |
+| `charHandler` ★ | Khi `__imeState` active + ký tự bình thường → `y.insert()` trực tiếp, bypass `P6` (stale closure) |
+| Auto-upgrade | Tự phát hiện patch v1–v8 và nâng cấp |
 
 ### Cài đặt
 
@@ -89,7 +85,7 @@ go install github.com/nguyenhx2/claude-telex/cmd/claude-telex@latest
 Chạy `claude-telex` - app sẽ:
 
 1. 🔍 Tự động tìm `cli.js` của Claude Code
-2. 🩹 Patch logic xử lý backspace (v2)
+2. 🩹 Patch logic xử lý IME (v9 engine-aware)
 3. 🖥️ Hiển thị icon ở system tray (cam = bật, xám = tắt)
 4. ⚙️ Mở Settings UI tại `http://127.0.0.1:9315`
 
@@ -147,7 +143,7 @@ graph TD
 | Package | Chức năng |
 |---|---|
 | `cmd/claude-telex` | Entry point, single-instance lock, orchestration |
-| `internal/patcher` | Tìm `cli.js`, trích xuất biến động bằng regex, inject fix v2 |
+| `internal/patcher` | Tìm `cli.js`, trích xuất biến động bằng regex, inject fix v9 (engine-aware) |
 | `internal/tray` | System tray (ICO trên Windows, PNG trên macOS/Linux) |
 | `internal/settings` | HTTP server tại port 9315, JSON API |
 | `internal/icon` | Vẽ icon programmatically (vòng tròn + chữ "VN") |
@@ -156,7 +152,7 @@ graph TD
 | `internal/state` | Lưu config JSON tại `~/.claude-telex/config.json` |
 | `assets/ui` | Embedded HTML Settings UI (dark theme, Inter font) |
 
-### Luồng Patching (v2)
+### Luồng Patching (v9)
 
 ```mermaid
 sequenceDiagram
@@ -167,13 +163,13 @@ sequenceDiagram
     U->>CT: Launch
     CT->>JS: FindCliJS()
     CT->>JS: ReadFile()
-    CT->>CT: Kiểm tra patch cũ (v1)?<br/>→ Restore backup, rồi re-patch
-    CT->>CT: findBugBlock()<br/>Tìm if(!key.backspace&&...includes("⌫"))
-    CT->>CT: extractVariables()<br/>Regex: input, keyInfo, curState,<br/>updateText, updateOfs, cleanup1/2, hasDTB
-    CT->>CT: generateFix()<br/>for..of: ⌫→deleteTokenBefore()??backspace()<br/>else→insert(_c)<br/>+ cleanup() + return
+    CT->>CT: Legacy patch (v1-v8)?<br/>→ Restore backup, rồi re-patch
+    CT->>CT: findBugBlock()<br/>Tìm .includes("\x7f")
+    CT->>CT: extractVariables()<br/>Regex: input, keyInfo, curState,<br/>updateText, updateOfs, cleanup1/2
+    CT->>CT: generateFix()<br/>stateSync + rawHandler +<br/>bsHandler + charHandler
     CT->>JS: Inject fix TRƯỚC early-return guard
     CT->>JS: WriteFile() + Verify marker
-    CT-->>U: ✅ Patched v2! System tray 🟠
+    CT-->>U: ✅ Patched v9! System tray 🟠
 ```
 
 ### Build & Chạy
@@ -240,49 +236,45 @@ goreleaser release --snapshot --clean
 
 ### The Problem
 
-When typing Vietnamese using TELEX IME (EVKey, UniKey, GoTiengViet...) in Claude Code CLI, characters are **lost** or **displayed incorrectly** because Claude Code processes delete characters (backspace `\x7F`) in batches instead of one-by-one.
+When typing Vietnamese using TELEX IME (EVKey, UniKey, GoTiengViet, [Gõ Nhanh](https://github.com/phucanh08/gonhanh)...) in Claude Code CLI, characters are **lost** or **displayed incorrectly**.
 
 > **Example:** Typing `banj` expecting `bạn`, but getting `bn` or garbled text.
 
 ### Root Cause
 
-Analysis of the actual Claude Code source (`cli.js`) revealed that the `onInput` function handles TELEX like this:
+Vietnamese IMEs use a **backspace + replace** protocol: send N × `\x7F` (delete) then replacement chars. Two issues in Claude Code:
 
-1. **Count** total `\x7F` (backspace) characters
-2. **Delete** N times using `deleteTokenBefore()??backspace()`
-3. **Never insert** the replacement characters (Anthropic's bug — they are dropped entirely!)
+1. **Stale closure**: `G6` (onInput) reads `y` state from a React closure — this state **never updates** between events within an IME burst
+2. **Split events**: Ink splits the burst into separate G6 calls — backspaces and replacement chars arrive in different calls
+3. **P6 uses stale state**: The text processor `P6(J6)(t)` captures state from React render, not from the `__imeState` bridge
 
-Result: characters get deleted but the correct Vietnamese character is never written.
+### The Solution — Engine-Aware Patch v9
 
-### The Solution — Patch Algorithm v2
-
-Claude Telex **directly patches** `cli.js`, replacing the broken logic with a loop that **processes each character sequentially**:
+Based on thorough analysis of the [Gõ Nhanh engine documentation](docs/core-engine-algorithm.md), Claude Telex **directly patches** `cli.js` with 4 components:
 
 ```mermaid
 flowchart LR
-    subgraph "❌ Original - Broken (Anthropic)"
-        A["EVKey sends: ⌫⌫ + ạn"] --> B["Count 2 backspaces"]
-        B --> C["deleteTokenBefore() × 2"]
-        C --> D["❌ Drop 'ạn' chars — never inserted!"]
+    subgraph "Engine Protocol"
+        A["Gõ Nhanh: rats → rất"] --> B["Result{bs:2, chars:['ấ','t']}"]
+        B --> C["Stdin: ⌫⌫ + ất"]
     end
-    subgraph "✅ Claude Telex v2 - Fixed"
-        E["EVKey sends: ⌫⌫ + ạn"] --> F["for..of each char"]
-        F --> G["⌫ → deleteTokenBefore() ?? backspace()"]
-        F --> H["ạ → .insert('ạ')"]
-        F --> I["n → .insert('n')"]
-        G & H & I --> J["✅ Correctly shows 'bạn'"]
+    subgraph "v9 Patch — 4 Handlers"
+        D["1. stateSync"] --> E["Restore y from __imeState"]
+        F["2. rawHandler"] --> G["Process full chunk atomically"]
+        H["3. bsHandler"] --> I["Catch split backspaces"]
+        J["4. charHandler ★"] --> K["Catch split replacement chars"]
     end
 ```
 
-**Key v2 patch details:**
+**Key v9 patch details:**
 
 | Component | Description |
 |---|---|
-| `deleteTokenBefore()??backspace()` | Deletes at token level (composed Unicode chars), not individual bytes |
-| `!J6.backspace&&!J6.delete` guard | Does not intercept real Backspace/Delete key presses |
-| Cleanup functions (`XI6(),MI6()`) | Calls Claude Code's internal cleanup functions correctly after processing |
-| `let _s = curState` | Locally scoped variable — never pollutes outer minified scope |
-| Auto-upgrade v1→v2 | Auto-detects and upgrades old patches on restart |
+| `stateSync` | Restores `y` from `globalThis.__imeState`, clears when React catches up or on control keys |
+| `rawHandler` | When `\x7f` in input → processes entire chunk atomically |
+| `bsHandler` | When Ink splits `\x7f` into `backspace=true` → bridges state |
+| `charHandler` ★ | When `__imeState` active + normal char → `y.insert()` directly, bypassing `P6` (stale closure) |
+| Auto-upgrade | Auto-detects patches v1–v8 and upgrades |
 
 ### Installation
 
@@ -309,7 +301,7 @@ go install github.com/nguyenhx2/claude-telex/cmd/claude-telex@latest
 Run `claude-telex` - the app will:
 
 1. 🔍 Auto-detect Claude Code's `cli.js`
-2. 🩹 Patch the backspace handling logic (v2)
+2. 🩹 Patch IME handling logic (v9 engine-aware)
 3. 🖥️ Show a system tray icon (orange = on, grey = off)
 4. ⚙️ Open Settings UI at `http://127.0.0.1:9315`
 
@@ -367,7 +359,7 @@ graph TD
 | Package | Description |
 |---|---|
 | `cmd/claude-telex` | Entry point, single-instance lock, orchestration |
-| `internal/patcher` | Find `cli.js`, extract dynamic vars via regex, inject fix v2 |
+| `internal/patcher` | Find `cli.js`, extract dynamic vars via regex, inject fix v9 (engine-aware) |
 | `internal/tray` | System tray (ICO on Windows, PNG on macOS/Linux) |
 | `internal/settings` | HTTP server at port 9315, JSON API |
 | `internal/icon` | Programmatic icon rendering (circle + "VN" text) |
@@ -376,7 +368,7 @@ graph TD
 | `internal/state` | JSON config at `~/.claude-telex/config.json` |
 | `assets/ui` | Embedded HTML Settings UI (dark theme, Inter font, copy CLI path) |
 
-### Patching Flow (v2)
+### Patching Flow (v9)
 
 ```mermaid
 sequenceDiagram
@@ -387,13 +379,13 @@ sequenceDiagram
     U->>CT: Launch
     CT->>JS: FindCliJS()
     CT->>JS: ReadFile()
-    CT->>CT: Legacy patch detected (v1)?<br/>→ Restore backup, then re-patch
-    CT->>CT: findBugBlock()<br/>Find if(!key.backspace&&...includes("⌫"))
-    CT->>CT: extractVariables()<br/>Regex: input, keyInfo, curState,<br/>updateText, updateOfs, cleanup1/2, hasDTB
-    CT->>CT: generateFix()<br/>for..of: ⌫→deleteTokenBefore()??backspace()<br/>else→insert(_c)<br/>+ cleanup() + return
+    CT->>CT: Legacy patch (v1-v8)?<br/>→ Restore backup, then re-patch
+    CT->>CT: findBugBlock()<br/>Find .includes("\x7f")
+    CT->>CT: extractVariables()<br/>Regex: input, keyInfo, curState,<br/>updateText, updateOfs, cleanup1/2
+    CT->>CT: generateFix()<br/>stateSync + rawHandler +<br/>bsHandler + charHandler
     CT->>JS: Inject fix BEFORE early-return guard
     CT->>JS: WriteFile() + Verify marker
-    CT-->>U: ✅ Patched v2! System tray 🟠
+    CT-->>U: ✅ Patched v9! System tray 🟠
 ```
 
 ### Build & Run
@@ -472,6 +464,11 @@ goreleaser release --snapshot --clean
   <a href="https://github.com/getlantern/systray">getlantern/systray</a> -
   <a href="https://pkg.go.dev/golang.design/x/hotkey">golang.design/x/hotkey</a> -
   <a href="https://pkg.go.dev/golang.org/x/image">golang.org/x/image</a>
+</p>
+
+<p align="center">
+  <b>Tài liệu kĩ thuật / Technical Docs:</b>
+  Thuật toán patch được thiết kế dựa trên <a href="docs/core-engine-algorithm.md">tài liệu kiến trúc engine</a> và <a href="docs/validation-algorithm.md">thuật toán validation</a> của <a href="https://github.com/phucanh08/gonhanh">Gõ Nhanh</a>
 </p>
 
 <p align="center">
