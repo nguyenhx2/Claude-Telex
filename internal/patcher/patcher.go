@@ -366,7 +366,7 @@ func generateFix(v *variables) string {
 	bsHandler := ""
 	if v.keyInfo != "" {
 		bsHandler = fmt.Sprintf(
-			`if(%s.backspace&&!%s.ctrl&&!%s.meta){`+
+			`if(globalThis.__imeState&&%s.backspace&&!%s.ctrl&&!%s.meta){`+
 				`let _s=%s.backspace();`+
 				`if(!%s.equals(_s)){`+
 				`if(%s.text!==_s.text)`+
