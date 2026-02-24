@@ -61,7 +61,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.goos }}
+          name: build-${{ matrix.goos }}${{ matrix.goarch && format('-{0}', matrix.goarch) || '' }}
           path: claude-telex_*
 
   publish:
