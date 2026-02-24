@@ -105,14 +105,32 @@ Chạy `claude-telex` - app sẽ:
 | **ibus-bamboo** | Linux | ✅ Hỗ trợ đầy đủ |
 | Bộ gõ khác (gửi `\x7F`) | Tất cả | ✅ Hoạt động |
 
-### 🖥️ Tương thích
+### Tương thích
 
 | Thành phần | Phiên bản | Trạng thái |
 |---|---|---|
-| 🤖 **Claude Code** | Mọi phiên bản (npm `@anthropic-ai/claude-code`) | ✅ Hỗ trợ |
-| 🪟 **Windows** | 10 / 11 (amd64, arm64) | ✅ Hỗ trợ |
-| 🍎 **macOS** | 12 Monterey+ (Intel & Apple Silicon) | ✅ Hỗ trợ |
-| 🐧 **Linux** | Ubuntu 20.04+, Fedora 36+, Arch (amd64, arm64) | ✅ Hỗ trợ |
+| **Claude Code** | Mọi phiên bản (npm `@anthropic-ai/claude-code`) | ✅ Hỗ trợ |
+| **Windows** | 10 / 11 (amd64, arm64) | ✅ Hỗ trợ |
+| **macOS** | 12 Monterey+ (Intel & Apple Silicon) | ✅ Hỗ trợ |
+| **Linux** | Ubuntu 20.04+, Fedora 36+, Arch (amd64, arm64) | ✅ Hỗ trợ |
+
+### Quy trình Patching
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CT as Claude Telex
+    participant JS as cli.js
+
+    U->>CT: Khởi động
+    CT->>JS: FindCliJS() — tìm file
+    CT->>JS: ReadFile()
+    CT->>CT: Patch cũ? → Restore backup
+    CT->>CT: findBugBlock() → extractVariables()
+    CT->>CT: generateFix()<br/>stateSync + rawHandler +<br/>bsHandler + charHandler
+    CT->>JS: Inject fix + WriteFile()
+    CT-->>U: ✅ Patched! System tray
+```
 
 ### Build & Chạy
 
@@ -233,14 +251,32 @@ Run `claude-telex` - the app will:
 | **ibus-bamboo** | Linux | ✅ Fully supported |
 | Other IMEs (sending `\x7F`) | All | ✅ Works |
 
-### 🖥️ Compatibility
+### Compatibility
 
 | Component | Version | Status |
 |---|---|---|
-| 🤖 **Claude Code** | All versions (npm `@anthropic-ai/claude-code`) | ✅ Supported |
-| 🪟 **Windows** | 10 / 11 (amd64, arm64) | ✅ Supported |
-| 🍎 **macOS** | 12 Monterey+ (Intel & Apple Silicon) | ✅ Supported |
-| 🐧 **Linux** | Ubuntu 20.04+, Fedora 36+, Arch (amd64, arm64) | ✅ Supported |
+| **Claude Code** | All versions (npm `@anthropic-ai/claude-code`) | ✅ Supported |
+| **Windows** | 10 / 11 (amd64, arm64) | ✅ Supported |
+| **macOS** | 12 Monterey+ (Intel & Apple Silicon) | ✅ Supported |
+| **Linux** | Ubuntu 20.04+, Fedora 36+, Arch (amd64, arm64) | ✅ Supported |
+
+### Patching Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CT as Claude Telex
+    participant JS as cli.js
+
+    U->>CT: Launch
+    CT->>JS: FindCliJS() — locate file
+    CT->>JS: ReadFile()
+    CT->>CT: Legacy patch? → Restore backup
+    CT->>CT: findBugBlock() → extractVariables()
+    CT->>CT: generateFix()<br/>stateSync + rawHandler +<br/>bsHandler + charHandler
+    CT->>JS: Inject fix + WriteFile()
+    CT-->>U: ✅ Patched! System tray
+```
 
 ### Build & Run
 
