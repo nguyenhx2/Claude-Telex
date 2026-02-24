@@ -17,33 +17,42 @@ import (
 )
 
 var (
-	colorOn  = color.RGBA{R: 232, G: 112, B: 64, A: 255}  // #E87040 Claude orange
-	colorOff = color.RGBA{R: 107, G: 114, B: 128, A: 255} // #6b7280 gray
-	white    = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	colorOn     = color.RGBA{R: 232, G: 112, B: 64, A: 255}  // #E87040 Claude orange
+	colorOff    = color.RGBA{R: 107, G: 114, B: 128, A: 255} // #6b7280 gray
+	colorUpdate = color.RGBA{R: 59, G: 130, B: 246, A: 255}  // #3b82f6 blue
+	white       = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+)
+
+const (
+	StateOff = iota
+	StateOn
+	StateUpdate
 )
 
 // ICO returns an ICO-encoded icon (32×32) for use with systray on Windows.
 // systray on Windows requires ICO format bytes.
-func ICO(enabled bool) []byte {
-	img := generateImage(enabled, 32)
+func ICO(state int) []byte {
+	img := generateImage(state, 32)
 	return encodeICO(img)
 }
 
 // PNG returns a PNG-encoded icon (64×64) for platforms that accept PNG.
-func PNG(enabled bool) []byte {
-	img := generateImage(enabled, 64)
+func PNG(state int) []byte {
+	img := generateImage(state, 64)
 	var buf bytes.Buffer
 	_ = png.Encode(&buf, img)
 	return buf.Bytes()
 }
 
-func generateImage(enabled bool, size int) *image.RGBA {
+func generateImage(state int, size int) *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, size, size))
 	draw.Draw(img, img.Bounds(), image.Transparent, image.Point{}, draw.Src)
 
 	c := colorOff
-	if enabled {
+	if state == StateOn {
 		c = colorOn
+	} else if state == StateUpdate {
+		c = colorUpdate
 	}
 
 	cx, cy := float64(size)/2, float64(size)/2

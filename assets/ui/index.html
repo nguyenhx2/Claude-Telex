@@ -210,6 +210,12 @@
       color: var(--muted);
     }
 
+    .badge.update {
+      background: rgba(234, 179, 8, .12);
+      color: rgba(217, 119, 6, 1);
+      /* tailwind amber-600 */
+    }
+
     .dot {
       width: 6px;
       height: 6px;
@@ -560,7 +566,11 @@
 
       const icon = document.getElementById('hdr-icon');
       const badge = document.getElementById('patch-badge');
-      if (s.patched && s.enabled) {
+      if (s.updateAvailable) {
+        badge.className = 'badge update';
+        badge.innerHTML = '<span class="dot"></span>Update Detected (Re-patch Required)';
+        icon.className = 'header-icon off';
+      } else if (s.patched && s.enabled) {
         badge.className = 'badge patched';
         badge.innerHTML = '<span class="dot"></span>Patched ✓';
         icon.className = 'header-icon';

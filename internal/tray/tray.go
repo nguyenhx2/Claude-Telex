@@ -2,9 +2,9 @@
 package tray
 
 import (
-	"fmt"
 	"log"
 	"runtime"
+	"time"
 
 	"github.com/getlantern/systray"
 	"github.com/nguyenhx2/claude-telex/internal/icon"
@@ -19,7 +19,7 @@ func Run(srv *settings.Server) {
 }
 
 func onReady(srv *settings.Server) {
-	setIcon(state.Get().Enabled)
+	refreshIcon()
 	systray.SetTitle("Claude TELEX")
 	systray.SetTooltip("Claude TELEX - Vietnamese IME Fix")
 
@@ -41,25 +41,35 @@ func onReady(srv *settings.Server) {
 	go startupPatch()
 }
 
-// setIcon updates the tray icon. Uses ICO on Windows, PNG elsewhere.
-func setIcon(enabled bool) {
+// refreshIcon updates the tray icon and tooltip.
+func refreshIcon() {
+	st := state.Get()
+
+	iconState := icon.StateOff
+	tooltip := "Claude TELEX - Vietnamese IME Fix [OFF]"
+
+	if st.Enabled {
+		if st.PatchPath != "" && !patcher.IsPatched(st.PatchPath) {
+			iconState = icon.StateUpdate
+			tooltip = "Claude TELEX - Needs Re-patch (Update Detected)"
+		} else {
+			iconState = icon.StateOn
+			tooltip = "Claude TELEX - Vietnamese IME Fix [ON]"
+		}
+	}
+
 	var iconBytes []byte
 	if runtime.GOOS == "windows" {
-		iconBytes = icon.ICO(enabled)
+		iconBytes = icon.ICO(iconState)
 	} else {
-		iconBytes = icon.PNG(enabled)
+		iconBytes = icon.PNG(iconState)
 	}
 	systray.SetIcon(iconBytes)
-
-	tooltip := "Claude TELEX - Vietnamese IME Fix [OFF]"
-	if enabled {
-		tooltip = "Claude TELEX - Vietnamese IME Fix [ON]"
-	}
 	systray.SetTooltip(tooltip)
 }
 
 // UpdateIcon refreshes the tray icon to match current state.
-func UpdateIcon() { setIcon(state.Get().Enabled) }
+func UpdateIcon() { refreshIcon() }
 
 func startupPatch() {
 	st := state.Get()
@@ -77,23 +87,33 @@ func startupPatch() {
 		state.Update(func(s *state.State) { s.PatchPath = path })
 	}
 	if patcher.IsPatched(path) {
-		ver := patcher.ClaudeVersion(path)
-		if ver != st.LastPatchedVersion {
-			log.Printf("version changed %s->%s, re-patching", st.LastPatchedVersion, ver)
-			_ = patcher.Restore(path)
-			if err := patcher.Patch(path); err == nil {
-				state.Update(func(s *state.State) { s.LastPatchedVersion = ver })
-			}
+		return
+	}
+
+	// First time install auto-patch (LastPatchedVersion is empty)
+	if st.LastPatchedVersion == "" {
+		if err := patcher.Patch(path); err != nil {
+			log.Printf("startup patch: %v", err)
+			return
 		}
-		return
+		ver := patcher.ClaudeVersion(path)
+		state.Update(func(s *state.State) { s.LastPatchedVersion = ver })
+		log.Printf("patched %s (%s)", path, ver)
+		refreshIcon()
+	} else {
+		// Enabled = true, IsPatched = false, LastPatchedVersion != ""
+		// This means Claude Code updated. Wait for user to repatch manually.
+		log.Printf("Update detected (missing patch). Prompting user.")
+		refreshIcon()
 	}
-	if err := patcher.Patch(path); err != nil {
-		log.Printf("startup patch: %v", err)
-		return
+}
+
+func backgroundUpdateCheck() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		refreshIcon()
 	}
-	ver := patcher.ClaudeVersion(path)
-	state.Update(func(s *state.State) { s.LastPatchedVersion = ver })
-	log.Printf("patched %s (%s)", path, ver)
 }
 
 // TogglePatch toggles enabled state; called from global hotkey.
@@ -116,7 +136,5 @@ func TogglePatch() {
 		_ = patcher.Restore(path)
 	}
 	state.Update(func(s *state.State) { s.Enabled = enabled })
-	setIcon(enabled)
-	msg := fmt.Sprintf("Vietnamese Fix: %s", map[bool]string{true: "ON \u2713", false: "OFF"}[enabled])
-	systray.SetTooltip(msg)
+	refreshIcon()
 }
