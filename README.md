@@ -30,8 +30,8 @@ Bộ gõ tiếng Việt hoạt động bằng giao thức **xoá + thay thế**:
 
 | Vấn đề | Giải thích |
 |---|---|
-| **State cũ trong closure** | Hàm `onInput` đọc state từ React closure — state không cập nhật giữa các event trong cùng 1 burst |
-| **Tách event** | Ink tách burst thành nhiều lần gọi riêng biệt — xoá và thay thế xảy ra ở các lần gọi khác nhau |
+| **State cũ trong closure** | Hàm `onInput` đọc state từ React closure - state không cập nhật giữa các event trong cùng 1 burst |
+| **Tách event** | Ink tách burst thành nhiều lần gọi riêng biệt - xoá và thay thế xảy ra ở các lần gọi khác nhau |
 | **Hàm P6 dùng state lỗi** | Hàm xử lý ký tự `P6(J6)(t)` bắt state từ React render, không từ state đã được sửa |
 
 ### Giải pháp
@@ -43,7 +43,7 @@ flowchart LR
     subgraph "Giao thức bộ gõ"
         A["Gõ: banj → bạn"] --> B["Gửi: ⌫⌫ + ạn"]
     end
-    subgraph "Claude Telex — 4 Handlers"
+    subgraph "Claude Telex - 4 Handlers"
         C["stateSync"] --> D["Khôi phục state đúng"]
         E["rawHandler"] --> F["Xử lý chunk nguyên"]
         G["bsHandler"] --> H["Bắt backspace tách lẻ"]
@@ -54,7 +54,7 @@ flowchart LR
 | Handler | Chức năng |
 |---|---|
 | **stateSync** | Khôi phục state từ `__imeState` bridge, tự xoá khi React đã cập nhật hoặc khi nhấn phím điều khiển |
-| **rawHandler** | Khi toàn bộ burst đến trong 1 chunk — xử lý nguyên khối |
+| **rawHandler** | Khi toàn bộ burst đến trong 1 chunk - xử lý nguyên khối |
 | **bsHandler** | Khi Ink tách `\x7F` thành sự kiện backspace riêng — bridge state |
 | **charHandler** | Khi ký tự thay thế đến sau backspace — dùng `insert()` trực tiếp, bỏ qua hàm P6 (state lỗi) |
 
@@ -123,7 +123,7 @@ sequenceDiagram
     participant JS as cli.js
 
     U->>CT: Khởi động
-    CT->>JS: FindCliJS() — tìm file
+    CT->>JS: FindCliJS() - tìm file
     CT->>JS: ReadFile()
     CT->>CT: Patch cũ? → Restore backup
     CT->>CT: findBugBlock() → extractVariables()
@@ -138,7 +138,7 @@ sequenceDiagram
 
 - **Go** 1.22+ ([tải tại đây](https://go.dev/dl/))
 - **Git** ([tải tại đây](https://git-scm.com/))
-- **Linux**: cần thêm `gcc`, `libgtk-3-dev`, `libappindicator3-dev`
+- **Linux**: cần thêm `gcc`, `libgtk-3-dev`, `libayatana-appindicator3-dev`
 
 #### Build
 
@@ -176,8 +176,8 @@ Vietnamese IMEs use a **delete + replace** protocol: send N delete characters (`
 
 | Issue | Explanation |
 |---|---|
-| **Stale closure state** | `onInput` reads state from a React closure — this state doesn't update between events in a burst |
-| **Split events** | Ink splits the burst into separate calls — deletes and replacements arrive in different calls |
+| **Stale closure state** | `onInput` reads state from a React closure - this state doesn't update between events in a burst |
+| **Split events** | Ink splits the burst into separate calls - deletes and replacements arrive in different calls |
 | **P6 uses stale state** | The text processor `P6(J6)(t)` captures state from React render, not from the bridged state |
 
 ### The Solution
@@ -189,7 +189,7 @@ flowchart LR
     subgraph "IME Protocol"
         A["Type: banj → bạn"] --> B["Send: ⌫⌫ + ạn"]
     end
-    subgraph "Claude Telex — 4 Handlers"
+    subgraph "Claude Telex - 4 Handlers"
         C["stateSync"] --> D["Restore correct state"]
         E["rawHandler"] --> F["Process full chunk"]
         G["bsHandler"] --> H["Catch split backspaces"]
@@ -200,7 +200,7 @@ flowchart LR
 | Handler | Purpose |
 |---|---|
 | **stateSync** | Restores state from `__imeState` bridge, auto-clears when React catches up or on control keys |
-| **rawHandler** | When the entire burst arrives in 1 chunk — processes atomically |
+| **rawHandler** | When the entire burst arrives in 1 chunk - processes atomically |
 | **bsHandler** | When Ink splits `\x7F` into separate backspace events — bridges state |
 | **charHandler** | When replacement chars arrive after backspaces — uses `insert()` directly, bypassing P6 (stale state) |
 
@@ -269,7 +269,7 @@ sequenceDiagram
     participant JS as cli.js
 
     U->>CT: Launch
-    CT->>JS: FindCliJS() — locate file
+    CT->>JS: FindCliJS() - locate file
     CT->>JS: ReadFile()
     CT->>CT: Legacy patch? → Restore backup
     CT->>CT: findBugBlock() → extractVariables()
@@ -284,7 +284,7 @@ sequenceDiagram
 
 - **Go** 1.22+ ([download](https://go.dev/dl/))
 - **Git** ([download](https://git-scm.com/))
-- **Linux**: also needs `gcc`, `libgtk-3-dev`, `libappindicator3-dev`
+- **Linux**: also needs `gcc`, `libgtk-3-dev`, `libayatana-appindicator3-dev`
 
 #### Build
 
