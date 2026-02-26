@@ -312,7 +312,10 @@ func extractVariables(block string) (*variables, error) {
 // variable with the same minified name.
 func generateFix(v *variables) string {
 	bsExpr := "_s=_s.backspace();"
-	bridge := "globalThis.__imeState=_s;"
+	// Bridge stores {s: EditorState, t: creationTimestamp}.
+	// On UPDATE, preserve the original creation time so the 200ms expiry
+	// counts from when the burst STARTED, not from each event.
+	bridge := "globalThis.__imeState={s:_s,t:globalThis.__imeState?globalThis.__imeState.t:Date.now()};"
 
 	// Build the cleanup calls
 	cleanup := ""
@@ -321,15 +324,23 @@ func generateFix(v *variables) string {
 	}
 
 	// stateSync preamble: restore or clear globalThis.__imeState.
-	// Control keys always have o==="" and backspace===false in Ink,
-	// so we detect them generically without listing individual keys.
+	//
+	// CRITICAL: Do NOT use text comparison (y.text === __imeState.s.text)
+	// to detect React catch-up. After bsHandler sets both y=_s and
+	// __imeState.s=_s, they're the SAME object — comparison always
+	// returns true, which would prematurely clear the bridge mid-burst.
+	//
+	// Instead, use ONLY:
+	// 1. Timestamp expiry (>200ms) — IME bursts complete in ~10ms
+	// 2. Control key detection — Enter, arrows, Escape, etc.
+
 	stateSync := fmt.Sprintf(
 		`if(globalThis.__imeState){`+
-			`if(%s.text===globalThis.__imeState.text)globalThis.__imeState=null;`+
+			`if(Date.now()-globalThis.__imeState.t>200)globalThis.__imeState=null;`+
 			`else if(%s.length===0&&!%s.backspace)globalThis.__imeState=null;`+
-			`else %s=globalThis.__imeState;`+
+			`else %s=globalThis.__imeState.s;`+
 			`}`,
-		v.curState, v.input, v.keyInfo, v.curState,
+		v.input, v.keyInfo, v.curState,
 	)
 
 	// Part 1: Raw \x7f handler (when IME data arrives as one chunk)
@@ -366,7 +377,7 @@ func generateFix(v *variables) string {
 	bsHandler := ""
 	if v.keyInfo != "" {
 		bsHandler = fmt.Sprintf(
-			`if(globalThis.__imeState&&%s.backspace&&!%s.ctrl&&!%s.meta){`+
+			`if(%s.backspace&&!%s.ctrl&&!%s.meta){`+
 				`let _s=%s.backspace();`+
 				`if(!%s.equals(_s)){`+
 				`if(%s.text!==_s.text)`+

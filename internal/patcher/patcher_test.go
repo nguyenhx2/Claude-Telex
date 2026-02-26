@@ -740,13 +740,17 @@ func TestGenerateFix_StateSyncRestoresState(t *testing.T) {
 	}
 	fix := generateFix(v)
 
-	// Must restore y from __imeState
-	if !strings.Contains(fix, "y=globalThis.__imeState") {
-		t.Error("fix must restore curState from __imeState")
+	// Must restore y from __imeState.s
+	if !strings.Contains(fix, "y=globalThis.__imeState.s") {
+		t.Error("fix must restore curState from __imeState.s")
 	}
-	// Must check text equality for auto-clear
-	if !strings.Contains(fix, "y.text===globalThis.__imeState.text") {
-		t.Error("fix must auto-clear when React catches up")
+	// Must expire stale bridges after 200ms
+	if !strings.Contains(fix, "Date.now()-globalThis.__imeState.t>200") {
+		t.Error("fix must expire stale bridges after 200ms")
+	}
+	// Must NOT use text comparison to clear bridge (it's always true after bsHandler)
+	if strings.Contains(fix, "__imeState.s.text)globalThis.__imeState=null") {
+		t.Error("fix must NOT use text comparison to clear bridge")
 	}
 }
 
@@ -758,8 +762,8 @@ func TestGenerateFix_IncludesImeStateBridge(t *testing.T) {
 	}
 	fix := generateFix(v)
 
-	if !strings.Contains(fix, "globalThis.__imeState=_s;") {
-		t.Error("fix must set globalThis.__imeState")
+	if !strings.Contains(fix, "globalThis.__imeState={s:_s,t:globalThis.__imeState?globalThis.__imeState.t:Date.now()};") {
+		t.Error("fix must set globalThis.__imeState with preserved timestamp")
 	}
 	if strings.Contains(fix, "setTimeout") {
 		t.Error("fix must NOT include setTimeout")
@@ -785,7 +789,7 @@ func TestGenerateFix_BackspaceInterception(t *testing.T) {
 		t.Error("fix must call curState.backspace() in backspace handler")
 	}
 	// Must save state to globalThis.__imeState in ALL THREE handlers
-	if c := strings.Count(fix, "globalThis.__imeState=_s;"); c < 3 {
+	if c := strings.Count(fix, "globalThis.__imeState={s:_s,t:globalThis.__imeState?globalThis.__imeState.t:Date.now()};"); c < 3 {
 		t.Errorf("fix must set __imeState in raw, backspace, AND char handlers, got %d occurrences", c)
 	}
 	// Must call cleanup in ALL THREE handlers
